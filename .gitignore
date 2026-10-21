@@ -1,0 +1,19 @@
+# ModelSim / QuestaSim Simulation Artifacts
+work/
+work_ms/
+transcript
+*.wlf
+*.vcd
+*.log
+compile.log
+
+# Temporary & Editor files
+.vscode/
+.idea/
+*.tmp
+Thumbs.db
+Desktop.ini
+~$*.docx
+
+# Unhydrated OneDrive files / unrelated docs
+SAFEFAIR.docx
