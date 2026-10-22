@@ -174,33 +174,25 @@ module tb_soc_integration;
         .err_o    (s_err   [3])
     );
 
-    // Slave 4: SPI Master (Hrdya)
-    spi_master u_spi (
-        .clk      (clk),
-        .rst_n    (rst_n),
-        .start    (s_we    [4] && s_addr[4][7:0] == 8'h00 && s_wdata[4][1]),
-        .tx_data  (s_wdata [4]),
-        .xfer_len (6'd8),
-        .clk_div  (16'd2),
-        .cpol     (1'b0),
-        .cpha     (1'b0),
-        .busy     (),
-        .done     (irq_spi_done),
-        .err_cfg  (),
-        .err_busy (),
-        .rx_data  (),
-        .sclk     (spi_sclk),
-        .mosi     (spi_mosi),
-        .miso     (spi_miso),
-        .cs_n     (spi_cs_n)
+    // Slave 4: SPI Master Controller (Hrdya)
+    spi_controller u_spi (
+        .clk_i      (clk),
+        .rst_ni     (rst_n),
+        .req_i      (s_req   [4]),
+        .gnt_o      (s_gnt   [4]),
+        .addr_i     (s_addr  [4]),
+        .we_i       (s_we    [4]),
+        .be_i       (s_be    [4]),
+        .wdata_i    (s_wdata [4]),
+        .rdata_o    (s_rdata [4]),
+        .rvalid_o   (s_rvalid[4]),
+        .err_o      (s_err   [4]),
+        .sclk_o     (spi_sclk),
+        .mosi_o     (spi_mosi),
+        .miso_i     (spi_miso),
+        .cs_n_o     (spi_cs_n),
+        .irq_done_o (irq_spi_done)
     );
-    // Simple SPI OBI shim for slave 4 response
-    assign s_gnt   [4] = s_req[4];
-    assign s_err   [4] = 1'b0;
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin s_rvalid[4] <= 1'b0; s_rdata[4] <= 32'd0; end
-        else begin s_rvalid[4] <= s_req[4]; s_rdata[4] <= 32'h0000_0001; end
-    end
 
     // Slave 5: CRC Checker (Bhumi)
     crc_checker u_crc (

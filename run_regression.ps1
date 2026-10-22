@@ -18,10 +18,10 @@ if (-not (Test-Path "work_ms")) {
 }
 
 $allRTL = @(
-    "bus_interconnect.sv", "payment_engine.sv", "spi_master.sv", "sram_model.sv",
-    "uart_rx.sv", "audio_engine.sv", "crc_checker.sv", "transaction_guard.sv",
-    "power_manager.sv", "sram_controller.sv", "transaction_cache.sv", "irq_ctrl.sv",
-    "clint.sv", "boot_rom.sv"
+    "bus_interconnect.sv", "payment_engine.sv", "spi_master.sv", "spi_controller.sv",
+    "sram_model.sv", "uart_rx.sv", "audio_engine.sv", "crc_checker.sv",
+    "transaction_guard.sv", "power_manager.sv", "sram_controller.sv",
+    "transaction_cache.sv", "irq_ctrl.sv", "clint.sv", "boot_rom.sv"
 )
 
 $tests = @(

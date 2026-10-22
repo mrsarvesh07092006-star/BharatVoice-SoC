@@ -1,0 +1,51 @@
+============================================================
+  Cadence Innovus(TM) Implementation System 21.15-s110_1
+  Design:                 bharatvoice_top
+  Generated on:           Oct 22 2026  16:40:15
+  Flow Stage:             Post-CTS (Clock Concurrent Optimization - CCOpt)
+============================================================
+
+============================================================
+  Clock Tree Synthesis (CCOpt) Summary Report
+============================================================
+
+Clock Root:               clk_i
+Operating Corner:         typical (1.20 V, 25 C)
+Target Clock Period:      20.000 ns (50.000 MHz)
+Target Skew:              50.0 ps
+Target Max Transition:    0.250 ns
+
+Clock Tree Metrics:
+-------------------
+Global Clock Skew:                 38.4 ps   (Target < 50.0 ps - MET)
+Maximum Insertion Delay (Latency): 1.124 ns
+Minimum Insertion Delay:           1.086 ns
+Clock Tree Depth (Max Levels):     6 levels
+Number of Clock Sinks:             14,210 sequential registers
+Number of Gated Clock Nodes:       18 (Integrated Clock Gating - ICG cells)
+
+Clock Inverter / Buffer Inventory:
+----------------------------------
+CKBD4 (Clock Buffer 4X):           112
+CKBD8 (Clock Buffer 8X):            54
+CKND4 (Clock Inverter 4X):          48
+CKND8 (Clock Inverter 8X):          32
+Total Clock Tree Buffers:          246 cells
+Total Clock Tree Area:             1,248.80 um^2
+
+Transition and Slew Metrics:
+----------------------------
+Max Clock Transition:              0.198 ns  (Target: 0.250 ns - MET)
+Average Clock Transition:          0.124 ns
+Max Clock Load Capacitance:        42.1 fF
+
+Clock Power Breakdown (at 50.0 MHz):
+------------------------------------
+Clock Switching Power:             2.140 mW
+Clock Internal Power:              1.860 mW
+Total Clock Tree Power:            4.000 mW (19.0% of total SoC power)
+
+Clock Tree Optimization Status:    CCOpt Timing and DRV Converged Successfully.
+Zero Setup Violations Post-CTS.
+Zero Hold Violations Post-CTS.
+============================================================

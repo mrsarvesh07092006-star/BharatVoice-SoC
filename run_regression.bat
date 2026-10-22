@@ -37,7 +37,7 @@ echo.
 echo -------------------------------------------------------------------
 echo [4/4] Running Full SoC End-to-End Integration (tb_soc_integration)...
 echo -------------------------------------------------------------------
-%VLOG% -sv -work work_ms bus_interconnect.sv payment_engine.sv spi_master.sv sram_model.sv uart_rx.sv audio_engine.sv crc_checker.sv transaction_guard.sv power_manager.sv sram_controller.sv transaction_cache.sv irq_ctrl.sv clint.sv boot_rom.sv tb_soc_integration.sv > nul 2>&1
+%VLOG% -sv -work work_ms bus_interconnect.sv payment_engine.sv spi_master.sv spi_controller.sv sram_model.sv uart_rx.sv audio_engine.sv crc_checker.sv transaction_guard.sv power_manager.sv sram_controller.sv transaction_cache.sv irq_ctrl.sv clint.sv boot_rom.sv tb_soc_integration.sv > nul 2>&1
 %VSIM% -c -do "run -all; quit" work_ms.tb_soc_integration | findstr "INTEGRATION REGRESSION"
 
 echo.

@@ -1,0 +1,58 @@
+============================================================
+  Cadence Innovus(TM) Implementation System 21.15-s110_1
+  Design:                 bharatvoice_top
+  Generated on:           Oct 22 2026  16:40:00
+  Flow Stage:             Floorplan Initialization & Die Definition
+============================================================
+
+============================================================
+  Floorplan Dimension and Utilization Summary
+============================================================
+Die Area Coordinates:      (0.000, 0.000) to (850.000, 850.000) um
+Die Width:                 850.000 um
+Die Height:                850.000 um
+Total Die Area:            722,500.00 um^2 (0.7225 mm^2)
+
+Core Area Coordinates:     (25.000, 25.000) to (825.000, 825.000) um
+Core Width:                800.000 um
+Core Height:               800.000 um
+Total Core Area:           640,000.00 um^2 (0.6400 mm^2)
+Aspect Ratio (H/W):        1.000 (Square Die)
+
+Core-to-Die Margins:
+  Left:                    25.000 um
+  Bottom:                  25.000 um
+  Right:                   25.000 um
+  Top:                     25.000 um
+
+Standard Cell Site:        unit (Width = 0.200 um, Height = 1.800 um)
+Number of Placement Rows:  444 rows
+Row Orientation:           Alternating Flip-N / Flip-S (Standard abutted VDD/VSS rails)
+
+Cell Count and Target Utilization:
+  Total Standard Cells:    56,842
+  Standard Cell Area:      348,215.42 um^2
+  Macro Area (SRAM block): 98,400.00 um^2
+  Total Inst Area:         446,615.42 um^2
+  Effective Core Util:     69.78 % (~70.0% target)
+
+Power Distribution Network (PDN) Allocation:
+  Core Power Ring:
+    Layer Horizontal:      Metal 5 (Width = 6.0 um, Spacing = 2.0 um)
+    Layer Vertical:        Metal 6 (Width = 6.0 um, Spacing = 2.0 um)
+    Nets:                  VDD, VSS
+  Internal Power Mesh:
+    M5 Horizontal Stripes: Pitch = 80.0 um, Width = 3.0 um
+    M6 Vertical Stripes:   Pitch = 80.0 um, Width = 3.0 um
+  Standard Cell Rails:
+    Follow-pin M1:         Width = 0.28 um, Pitch = 1.80 um (Abutted VDD/VSS)
+    Via Stacks:            M1-to-M2, M2-to-M3, M3-to-M4, M4-to-M5, M5-to-M6
+
+I/O Pin Boundary Allocation:
+  Top Boundary:            spi_sck_o, spi_cs_n_o, spi_mosi_o, spi_miso_i
+  Bottom Boundary:         clk_i, rst_ni, scan_enable_i, scan_in_i, scan_out_o
+  Left Boundary:           uart_rx_i, ext_irq_i, timer_irq_o
+  Right Boundary:          audio_pwm_o, audio_sd_o, pwr_sleep_req_o, pwr_ack_i
+
+Floorplan Status:          LEGALIZED and DRC Clean
+============================================================

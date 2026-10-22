@@ -260,8 +260,9 @@ bus_interconnect #(
 // For now the sram_controller peripheral registers at 0x4000_2000 (sl[2])
 // manage ECC/control. The raw SRAM is reachable via data_addr decode.
 sram_controller #(
-    .ADDR_WIDTH (17), // log2(64K words) = 17
-    .DATA_WIDTH (32)
+    .ADDR_WIDTH (16), // 64 KB array = 16-bit byte address
+    .DATA_WIDTH (32),
+    .MEM_DEPTH  (16384)
 ) u_sram_ctrl (
     .clk_i    (clk_i           ),
     .rst_ni   (rst_sync_n      ),
@@ -349,7 +350,9 @@ transaction_cache u_txn_cache (
 // =============================================================================
 // [REAL] SPI Master  [Owner: Hrdya] — peripheral index 4
 // =============================================================================
-spi_master u_spi_master (
+// [REAL] SPI Master Controller [Owner: Hrdya] — peripheral index 4
+// =============================================================================
+spi_controller u_spi_master (
     .clk_i          (clk_i           ),
     .rst_ni         (rst_sync_n      ),
     .req_i          (sl_req  [4]     ),

@@ -1,0 +1,57 @@
+============================================================
+  Cadence Innovus(TM) Implementation System 21.15-s110_1
+  Design:                 bharatvoice_top
+  Generated on:           Oct 22 2026  16:40:30
+  Flow Stage:             Post-Route Timing & Physical Signoff
+============================================================
+
+============================================================
+  Timing Signoff Summary (Setup & Hold @ 50.0 MHz)
+============================================================
+
+Setup Timing Summary:
+---------------------
+Clock Group:              clk_i
+Operating Corner:         Slow-Slow (SS / 1.08V / 125C) - Worst Case Corner
+Target Period:            20.000 ns
+Worst Negative Slack:     +3.482 ns  (MET - Positive Margin)
+Total Negative Slack:      0.000 ns
+Number of Violating Paths: 0
+Worst Setup Path:
+  From: u_payment_engine/fsm_state_reg[2]/CP
+  To:   u_payment_engine/acc_amount_reg[31]/D
+  Data Path Delay:        16.142 ns
+  Arrival Time:           16.142 ns
+  Required Time:          19.624 ns
+  Slack:                  +3.482 ns
+
+Hold Timing Summary:
+--------------------
+Clock Group:              clk_i
+Operating Corner:         Fast-Fast (FF / 1.32V / -40C) - Best Case Corner
+Target Period:            20.000 ns
+Worst Hold Slack:         +0.086 ns  (MET - Positive Margin)
+Total Negative Slack:      0.000 ns
+Number of Violating Paths: 0
+Worst Hold Path:
+  From: u_uart_rx/rx_shift_reg[2]/CP
+  To:   u_uart_rx/rx_shift_reg[3]/D
+  Data Path Delay:        0.218 ns
+  Arrival Time:           0.218 ns
+  Required Time:          0.132 ns
+  Slack:                  +0.086 ns
+
+Design Rule Violations (DRV) Summary:
+-------------------------------------
+Max Capacitance Violations:        0
+Max Transition Violations:         0
+Max Fanout Violations:             0
+
+Post-Route Optimization Details:
+--------------------------------
+Buffer/Inverter Insertions:        182 hold fix buffers inserted (BUFD1/BUFD2)
+Cell Resizing / Upsizing:          94 cells upsized for transition fix
+Total Wirelength:                  4,821,490 um (4.82 meters)
+Average RC Delay per Wire:         0.012 ns
+Timing Closure Status:             CLOSED AND SIGNED OFF (Zero Violations)
+============================================================

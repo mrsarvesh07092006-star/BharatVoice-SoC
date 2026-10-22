@@ -26,6 +26,7 @@ SystemVerilog RTL and verified with automated testbenches.
 | `sram_controller.sv`  | `sram_controller`  | **Real** | Hrdya   | `sram_controller.sv`    | 64 KB SRAM datapath & controller |
 | `sram_model.sv`       | `sram_model`       | **Real** | Hrdya   | `sram_model.sv`         | Parameterized behavioral SRAM |
 | `transaction_cache.sv`| `transaction_cache`| **Real** | Hrdya   | `transaction_cache.sv`  | 16-entry fast transaction cache |
+| `spi_controller.sv`   | `spi_controller`   | **Real** | Hrdya   | `spi_controller.sv`     | OBI bus wrapper for SPI Master |
 | `spi_master.sv`       | `spi_master`       | **Real** | Hrdya   | `spi_master.sv`         | SPI master (modes 0-3) |
 | `crc_checker.sv`      | `crc_checker`      | **Real** | Bhumi   | `crc_checker.sv`        | Hardware CRC accelerator |
 | `transaction_guard.sv`| `transaction_guard`| **Real** | Bhumi   | `transaction_guard.sv`  | Replay attack & duplicate guard |
