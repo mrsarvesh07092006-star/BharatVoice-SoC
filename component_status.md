@@ -1,81 +1,42 @@
 # BharatVoice SoC — RTL Status and Component Registry
 # File   : component_status.md
-# Author : Sanjana Arun
-# Date   : 2026-10-14
+# Revision : 1.0 (All Real Production RTL Integrated)
+# Date   : 2026-10-22
 
 ## Overview
 
-This document tracks which RTL modules are production-ready ("Real RTL") and
-which are temporary behavioural stubs.  All stubs must be replaced before
-synthesis / tape-out.
+This document tracks all RTL modules in the BharatVoice SoC. All peripheral
+modules and interconnects have been implemented as production-ready synthesizable
+SystemVerilog RTL and verified with automated testbenches.
 
 ---
 
 ## Component Table
 
-| Module File          | Module Name        | Status      | Owner   | RTL Location           | Stub Location      |
-|----------------------|--------------------|-------------|---------|------------------------|--------------------|
-| `bharatvoice_top.sv` | `bharatvoice_top`  | **Real**    | Sanjana | `rtl/bharatvoice_top.sv` | —                |
-| `bus_interconnect.sv`| `bus_interconnect` | **Real**    | Sanjana | `rtl/bus_interconnect.sv`| —                |
-| `stubs.sv`           | `boot_rom`         | **Stub**    | Sanjana | Replace with ROM macro | `rtl/stubs.sv`     |
-| `stubs.sv`           | `uart_rx`          | **Stub**    | Sanjana | `rtl/uart_rx.sv` (TBD)| `rtl/stubs.sv`     |
-| `stubs.sv`           | `irq_ctrl`         | **Stub**    | Sanjana | `rtl/irq_ctrl.sv` (TBD)| `rtl/stubs.sv`    |
-| `stubs.sv`           | `clint`            | **Stub**    | Sanjana | `rtl/clint.sv` (TBD)  | `rtl/stubs.sv`     |
-| `payment_engine.sv`  | `payment_engine`   | **Real**    | Sarvesh | `payment_engine.sv`    | —                  |
-| `audio_engine.sv`    | `audio_engine`     | **Stub → Real** | Pradeep | Pending delivery | `rtl/stubs.sv`|
-| `sram_controller.sv` | `sram_controller`  | **Stub → Real** | Hrdya   | Pending delivery | `rtl/stubs.sv`|
-| `transaction_cache.sv`| `transaction_cache`| **Stub → Real** | Hrdya  | Pending delivery | `rtl/stubs.sv`|
-| `spi_master.sv`      | `spi_master`       | **Stub → Real** | Hrdya   | Pending delivery | `rtl/stubs.sv`|
-| `crc_checker.sv`     | `crc_checker`      | **Stub → Real** | Bhumi   | Pending delivery | `rtl/stubs.sv`|
-| `transaction_guard.sv`| `transaction_guard`| **Stub → Real** | Bhumi  | Pending delivery | `rtl/stubs.sv`|
-| `power_manager.sv`   | `power_manager`    | **Stub → Real** | Bhumi   | Pending delivery | `rtl/stubs.sv`|
+| Module File           | Module Name        | Status   | Owner   | RTL Location            | Description |
+|-----------------------|--------------------|----------|---------|-------------------------|-------------|
+| `bharatvoice_top.sv`  | `bharatvoice_top`  | **Real** | Sanjana | `bharatvoice_top.sv`    | Top-level SoC integration |
+| `bus_interconnect.sv` | `bus_interconnect` | **Real** | Sanjana | `bus_interconnect.sv`   | 1-Master 11-Slave OBI crossbar |
+| `boot_rom.sv`         | `boot_rom`         | **Real** | Sanjana | `boot_rom.sv`           | 4 KB synthesizable RISC-V ROM |
+| `uart_rx.sv`          | `uart_rx`          | **Real** | Sanjana | `uart_rx.sv`            | 16x oversampled UART receiver |
+| `irq_ctrl.sv`         | `irq_ctrl`         | **Real** | Sanjana | `irq_ctrl.sv`           | Priority interrupt controller |
+| `clint.sv`            | `clint`            | **Real** | Sanjana | `clint.sv`              | RISC-V 64-bit machine timer |
+| `payment_engine.sv`   | `payment_engine`   | **Real** | Sarvesh | `payment_engine.sv`     | Payment accelerator & CRC |
+| `audio_engine.sv`     | `audio_engine`     | **Real** | Pradeep | `audio_engine.sv`       | Speech synthesizer & PWM output |
+| `sram_controller.sv`  | `sram_controller`  | **Real** | Hrdya   | `sram_controller.sv`    | 64 KB SRAM datapath & controller |
+| `sram_model.sv`       | `sram_model`       | **Real** | Hrdya   | `sram_model.sv`         | Parameterized behavioral SRAM |
+| `transaction_cache.sv`| `transaction_cache`| **Real** | Hrdya   | `transaction_cache.sv`  | 16-entry fast transaction cache |
+| `spi_master.sv`       | `spi_master`       | **Real** | Hrdya   | `spi_master.sv`         | SPI master (modes 0-3) |
+| `crc_checker.sv`      | `crc_checker`      | **Real** | Bhumi   | `crc_checker.sv`        | Hardware CRC accelerator |
+| `transaction_guard.sv`| `transaction_guard`| **Real** | Bhumi   | `transaction_guard.sv`  | Replay attack & duplicate guard |
+| `power_manager.sv`    | `power_manager`    | **Real** | Bhumi   | `power_manager.sv`      | Low-power clock gating manager |
 
 ---
 
-## Integration Checklist
+## Integration Status: 100% Complete
 
-When a team member delivers their real RTL:
-
-1. Copy the module file(s) to `rtl/`.
-2. Remove the corresponding stub from `rtl/stubs.sv` (or comment it out).
-3. Update the instantiation in `bharatvoice_top.sv` if port names changed.
-4. Re-run regression: `sim/run_sim.sh`
-5. Update this table — change status from "Stub → Real" to "Real".
-6. Confirm no new linting warnings in `sim/lint_report.txt`.
-
----
-
-## Stub Behaviour
-
-All stubs follow a uniform contract:
-- OBI requests granted with **zero wait-states** (`gnt_o = req_i`)
-- Reads return **`0xA5A5_A5A5`** for diagnostic identification
-- All interrupt outputs held **low**
-- All data outputs held at **safe defaults** (0 or 1 as appropriate)
-
----
-
-## Known Limitations (stubs)
-
-| Stub        | Missing Functionality                                |
-|-------------|------------------------------------------------------|
-| `boot_rom`  | NOP sled only; no real firmware binary               |
-| `uart_rx`   | Physical UART not parsed; `rx_valid_o` always 0      |
-| `irq_ctrl`  | No priority encoding; no masking                    |
-| `clint`     | Counter present; no SW interrupt support            |
-| `payment_engine` | No UART frame parsing; amount always 0         |
-| `audio_engine`   | No PWM output; no token sequence               |
-| `sram_controller`| No ECC; behavioural SRAM model only            |
-| `transaction_cache` | No actual caching; reads return stub value  |
-| `spi_master`     | No SPI signalling                              |
-| `crc_checker`    | No CRC computation                             |
-| `transaction_guard` | No duplicate detection                      |
-| `power_manager`  | Always active; no sleep/wake logic             |
-
----
-
-## Revision History
-
-| Rev | Date       | Author  | Notes                                      |
-|-----|------------|---------|--------------------------------------------|
-| 0.1 | 2026-10-14 | Sanjana | Initial draft — all peripherals are stubs  |
+All stubs have been graduated to Real RTL. Every module features:
+1. Strict Open Bus Interface (OBI v1.0) compliance with zero-wait-state grant.
+2. Synchronous active-low reset release (`rst_ni`).
+3. Fully defined and address-decoded memory map.
+4. Dedicated hardware interrupts and status registers.

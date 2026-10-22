@@ -156,7 +156,7 @@ always_ff @(posedge clk_i or negedge rst_ni) begin
     end else if (m_req_i & m_gnt_o) begin
         sel_slave_q  <= sel_slave;
         decode_err_q <= decode_error;
-    end else begin
+    end else if (m_rvalid_o) begin
         sel_slave_q  <= '0;
         decode_err_q <= 1'b0;
     end
