@@ -97,7 +97,7 @@ set hdl_files [list \
 ]
 
 puts "\[INFO\] Reading SystemVerilog files..."
-read_hdl -language sv $hdl_files
+read_hdl -language sv -define SYNTHESIS $hdl_files
 
 # -----------------------------------------------------------------------------
 # 3. Elaboration

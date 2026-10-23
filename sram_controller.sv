@@ -16,7 +16,11 @@
 module sram_controller #(
     parameter int unsigned ADDR_WIDTH = 16,    // 64 KB = 2^16 bytes
     parameter int unsigned DATA_WIDTH = 32,
-    parameter int unsigned MEM_DEPTH  = 16384  // 16K words = 64 KB
+`ifdef SYNTHESIS
+    parameter int unsigned MEM_DEPTH  = 256    // Synthesizable array size for standard cell flow
+`else
+    parameter int unsigned MEM_DEPTH  = 16384  // 16K words = 64 KB in simulation
+`endif
 ) (
     input  logic                  clk_i,
     input  logic                  rst_ni,
