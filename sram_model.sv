@@ -68,7 +68,7 @@ module sram_model #(
     parameter int unsigned INIT_MODE    = 0,     // 0 fill, 1 X, 2 hex file
     parameter logic [DATA_W-1:0] INIT_VALUE = '0,
     parameter logic [DATA_W-1:0] ERR_RDATA  = {((DATA_W+31)/32){32'hDEAD_BEEF}},
-    parameter string INIT_FILE = ""
+    parameter                     INIT_FILE  = ""
 ) (
     input  logic                clk,
     input  logic                rst_n,
@@ -87,6 +87,7 @@ module sram_model #(
     localparam int unsigned BYTE_LSB = $clog2(BE_W);          // 0 when DATA_W=8
     localparam int unsigned IDX_W    = (DEPTH > 1) ? $clog2(DEPTH) : 1;
 
+`ifndef SYNTHESIS
     // ---- simulation-only parameter sanity checks ----
     initial begin
         if (READ_LATENCY < 1)      $fatal(1, "sram_model: READ_LATENCY must be >= 1");
@@ -95,10 +96,12 @@ module sram_model #(
         if (ADDR_W > 32)           $fatal(1, "sram_model: ADDR_W must be <= 32");
         if (IDX_W > ADDR_W - BYTE_LSB) $fatal(1, "sram_model: DEPTH too large for ADDR_W");
     end
+`endif
 
     // ---- storage ----
     logic [DATA_W-1:0] mem [0:DEPTH-1];
 
+`ifndef SYNTHESIS
     // simulation-only initialisation
     initial begin
         for (int i = 0; i < DEPTH; i++) begin
@@ -107,6 +110,7 @@ module sram_model #(
         end
         if (INIT_MODE == 2) $readmemh(INIT_FILE, mem);
     end
+`endif
 
     // ---- address decode (purely combinational, no loops) ----
     wire [ADDR_W-1:0] widx_full = addr >> BYTE_LSB;
