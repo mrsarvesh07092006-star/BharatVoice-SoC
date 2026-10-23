@@ -90,6 +90,11 @@ module audio_engine (
         tens      = rupees % 100;
 
         idx = 0;
+        // Pre-initialize sequence array with silence (constant bounded for synthesis)
+        for (int i = 0; i < 8; i++) begin
+            seq[i] = TOK_SILENCE;
+        end
+
         seq[0] = TOK_RUPEES;
         idx++;
 
@@ -115,11 +120,6 @@ module audio_engine (
         seq[idx] = TOK_RECEIVED;
         idx++;
         len = idx[2:0];
-
-        // Pad remainder with silence
-        for (int i = idx; i < 8; i++) begin
-            seq[i] = TOK_SILENCE;
-        end
     endfunction
 
     // PWM Audio Synthesizer
