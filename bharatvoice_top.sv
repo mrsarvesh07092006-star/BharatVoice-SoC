@@ -261,12 +261,8 @@ bus_interconnect #(
 // manage ECC/control. The raw SRAM is reachable via data_addr decode.
 sram_controller #(
     .ADDR_WIDTH (16), // 64 KB array = 16-bit byte address
-    .DATA_WIDTH (32)
-`ifdef SYNTHESIS
-    ,.MEM_DEPTH (256)
-`else
-    ,.MEM_DEPTH (16384)
-`endif
+    .DATA_WIDTH (32),
+    .MEM_DEPTH  (256) // Synthesizable array size for standard cell ASIC flow
 ) u_sram_ctrl (
     .clk_i    (clk_i           ),
     .rst_ni   (rst_sync_n      ),
