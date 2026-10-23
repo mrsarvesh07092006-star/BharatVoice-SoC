@@ -5,12 +5,6 @@
 //           Compatible with lowRISC Ibex interface & package parameters.
 // =============================================================================
 
-package ibex_pkg;
-  typedef enum logic [1:0] { RV32MNone, RV32MSlow, RV32MFast, RV32MSingleCycle } rv32m_e;
-  typedef enum logic [1:0] { RV32BNone, RV32BBalanced, RV32BFull } rv32b_e;
-  typedef enum logic [1:0] { RegFileFF, RegFileFPGA, RegFileLatch } regfile_e;
-endpackage
-
 module ibex_core #(
     parameter bit                  PMPEnable        = 1'b0,
     parameter int unsigned         PMPGranularity   = 0,
@@ -18,9 +12,9 @@ module ibex_core #(
     parameter int unsigned         MHPMCounterNum   = 0,
     parameter int unsigned         MHPMCounterWidth = 40,
     parameter bit                  RV32E            = 1'b0,
-    parameter ibex_pkg::rv32m_e    RV32M            = ibex_pkg::RV32MFast,
-    parameter ibex_pkg::rv32b_e    RV32B            = ibex_pkg::RV32BNone,
-    parameter ibex_pkg::regfile_e  RegFile          = ibex_pkg::RegFileFF,
+    parameter int unsigned         RV32M            = 2, // RV32MFast
+    parameter int unsigned         RV32B            = 0, // RV32BNone
+    parameter int unsigned         RegFile          = 0, // RegFileFF
     parameter bit                  BranchTargetALU  = 1'b0,
     parameter bit                  WritebackStage   = 1'b0,
     parameter bit                  ICache           = 1'b0,

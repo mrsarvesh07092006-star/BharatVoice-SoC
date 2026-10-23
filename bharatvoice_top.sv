@@ -158,9 +158,6 @@ ibex_core #(
     .PMPEnable        (1'b0),
     .MHPMCounterNum   (0   ),
     .RV32E            (1'b0),  // Use full RV32I (not embedded)
-    .RV32M            (ibex_pkg::RV32MFast), // Fast multiplier
-    .RV32B            (ibex_pkg::RV32BNone),
-    .RegFile          (ibex_pkg::RegFileFF),
     .ICache           (1'b0),
     .ICacheECC        (1'b0),
     .BranchTargetALU  (1'b1),
