@@ -17,3 +17,9 @@ Desktop.ini
 
 # Unhydrated OneDrive files / unrelated docs
 SAFEFAIR.docx
+
+# Quartus Temporary Database & Simulation Work Dirs
+quartus/db/
+quartus/incremental_db/
+quartus/simulation/
+

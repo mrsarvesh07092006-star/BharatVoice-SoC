@@ -121,8 +121,9 @@ end
 // Drive slave request lines
 // Each slave receives the request only when selected
 // =============================================================================
+genvar s;
 generate
-    for (genvar s = 0; s < N_SLAVES; s++) begin : gen_slave_req
+    for (s = 0; s < N_SLAVES; s++) begin : gen_slave_req
         assign s_req_o  [s] = m_req_i & sel_slave[s];
         assign s_addr_o [s] = m_addr_i;
         assign s_we_o   [s] = m_we_i;
