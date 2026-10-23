@@ -5,12 +5,31 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
+# 0. Automatically Determine Project Root Directory
+# -----------------------------------------------------------------------------
+set script_path [file normalize [info script]]
+set script_dir  [file dirname $script_path]
+
+if {[file exists [file join $script_dir "../../bharatvoice_top.sv"]]} {
+    set prj_root [file normalize [file join $script_dir "../.."]]
+} elseif {[file exists [file join $script_dir "../bharatvoice_top.sv"]]} {
+    set prj_root [file normalize [file join $script_dir ".."]]
+} elseif {[file exists "./bharatvoice_top.sv"]} {
+    set prj_root [file normalize "."]
+} else {
+    set prj_root [pwd]
+}
+
+puts "\[INFO\] Project root directory identified as: $prj_root"
+
+# -----------------------------------------------------------------------------
 # 1. Design Initialization & MMMC Setup
 # -----------------------------------------------------------------------------
 proc init_design_flow {} {
     global init_lef_file
     global init_verilog
     global init_top_cell
+    global prj_root
 
     # Read physical libraries (90nm Foundry LEF files)
     set init_lef_file {
@@ -19,14 +38,17 @@ proc init_design_flow {} {
     }
 
     # Locate synthesized gate-level netlist
-    if {[file exists ./syn/netlists/bharatvoice_top_netlist.v]} {
-        set init_verilog ./syn/netlists/bharatvoice_top_netlist.v
-    } elseif {[file exists ./netlists/bharatvoice_top_netlist.v]} {
-        set init_verilog ./netlists/bharatvoice_top_netlist.v
-    } elseif {[file exists ../synthesis/netlists/bharatvoice_top_netlist.v]} {
-        set init_verilog ../synthesis/netlists/bharatvoice_top_netlist.v
-    } else {
-        set init_verilog ./syn/netlists/bharatvoice_top_netlist.v
+    set netlist_candidates [list \
+        [file join $prj_root "syn/netlists/bharatvoice_top_netlist.v"] \
+        [file join $prj_root "netlists/bharatvoice_top_netlist.v"] \
+        "./syn/netlists/bharatvoice_top_netlist.v" \
+        "./netlists/bharatvoice_top_netlist.v" \
+        "../synthesis/netlists/bharatvoice_top_netlist.v" \
+    ]
+
+    set init_verilog [lindex $netlist_candidates 0]
+    foreach n $netlist_candidates {
+        if {[file exists $n]} { set init_verilog $n; break }
     }
 
     set init_top_cell bharatvoice_top
@@ -35,9 +57,24 @@ proc init_design_flow {} {
     set ::init_gnd_net {VSS}
 
     # Locate timing libraries (.lib)
-    set slow_candidates [list "../synthesis/slow.lib" "./syn/slow.lib" "./slow.lib" "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/slow.lib"]
-    set typ_candidates  [list "../synthesis/typical.lib" "./syn/typical.lib" "./typical.lib" "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/typical.lib"]
-    set fast_candidates [list "../synthesis/fast.lib" "./syn/fast.lib" "./fast.lib" "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/fast.lib"]
+    set slow_candidates [list \
+        "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/slow.lib" \
+        [file join $prj_root "syn/slow.lib"] \
+        [file join $prj_root "slow.lib"] \
+        "../synthesis/slow.lib" \
+    ]
+    set typ_candidates [list \
+        "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/typical.lib" \
+        [file join $prj_root "syn/typical.lib"] \
+        [file join $prj_root "typical.lib"] \
+        "../synthesis/typical.lib" \
+    ]
+    set fast_candidates [list \
+        "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/fast.lib" \
+        [file join $prj_root "syn/fast.lib"] \
+        [file join $prj_root "fast.lib"] \
+        "../synthesis/fast.lib" \
+    ]
 
     set slow_file [lindex $slow_candidates 0]
     foreach f $slow_candidates { if {[file exists $f]} { set slow_file $f; break } }
@@ -49,15 +86,18 @@ proc init_design_flow {} {
     foreach f $fast_candidates { if {[file exists $f]} { set fast_file $f; break } }
 
     # Locate SDC constraints
-    if {[file exists ./bharatvoice_top.sdc]} {
-        set sdc_file ./bharatvoice_top.sdc
-    } elseif {[file exists ./syn/constraints/bharatvoice.sdc]} {
-        set sdc_file ./syn/constraints/bharatvoice.sdc
-    } elseif {[file exists ../synthesis/bharatvoice_top.sdc]} {
-        set sdc_file ../synthesis/bharatvoice_top.sdc
-    } else {
-        set sdc_file ./syn/constraints/bharatvoice.sdc
-    }
+    set sdc_candidates [list \
+        [file join $prj_root "bharatvoice_top.sdc"] \
+        [file join $prj_root "syn/constraints/bharatvoice.sdc"] \
+        "./bharatvoice_top.sdc" \
+        "../synthesis/bharatvoice_top.sdc" \
+    ]
+    set sdc_file [lindex $sdc_candidates 0]
+    foreach s $sdc_candidates { if {[file exists $s]} { set sdc_file $s; break } }
+
+    puts "\[INFO\] Using Netlist : $init_verilog"
+    puts "\[INFO\] Using SDC     : $sdc_file"
+    puts "\[INFO\] Using Slow Lib: $slow_file"
 
     # Timing libraries
     create_library_set -name slow_lib    -timing [list $slow_file]
@@ -209,15 +249,19 @@ proc routing {} {
 # 7. Physical Verification & Signoff (DRC, LVS, GDSII)
 # -----------------------------------------------------------------------------
 proc signoff {} {
-    file mkdir ./output
-    file mkdir ./pnr/reports
+    global prj_root
+
+    set out_dir [file join $prj_root "output"]
+    set rep_dir [file join $prj_root "pnr/reports"]
+    file mkdir $out_dir
+    file mkdir $rep_dir
 
     # DRC & Connectivity checks
-    verify_drc -report ./pnr/reports/innovus_drc.rpt -limit 1000
-    verify_connectivity -type all -report ./pnr/reports/innovus_lvs.rpt
+    verify_drc -report [file join $rep_dir "innovus_drc.rpt"] -limit 1000
+    verify_connectivity -type all -report [file join $rep_dir "innovus_lvs.rpt"]
 
     # Stream out final tapeout GDSII
-    streamOut ./output/bharatvoice_top.gds \
+    streamOut [file join $out_dir "bharatvoice_top.gds"] \
         -libName bharatvoice_top \
         -merge /home/cadence/install/FOUNDRY/digital/90nm/dig/gds/gsclib090.gds \
         -units 1000 \
@@ -225,8 +269,8 @@ proc signoff {} {
 
     puts "======================================================================="
     puts "  INNOVUS PHYSICAL DESIGN COMPLETED FOR bharatvoice_top"
-    puts "  GDSII   : ./output/bharatvoice_top.gds"
-    puts "  Reports : ./pnr/reports/"
+    puts "  GDSII   : [file join $out_dir "bharatvoice_top.gds"]"
+    puts "  Reports : $rep_dir"
     puts "======================================================================="
 }
 

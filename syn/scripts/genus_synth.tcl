@@ -5,10 +5,29 @@
 # =============================================================================
 
 set design bharatvoice_top
-set rep_dir syn/reports
-set net_dir syn/netlists
 
-# Create output directories if they don't exist
+# -----------------------------------------------------------------------------
+# 0. Automatically Determine Project Root Directory
+# -----------------------------------------------------------------------------
+set script_path [file normalize [info script]]
+set script_dir  [file dirname $script_path]
+
+if {[file exists [file join $script_dir "../../bharatvoice_top.sv"]]} {
+    set prj_root [file normalize [file join $script_dir "../.."]]
+} elseif {[file exists [file join $script_dir "../bharatvoice_top.sv"]]} {
+    set prj_root [file normalize [file join $script_dir ".."]]
+} elseif {[file exists "./bharatvoice_top.sv"]} {
+    set prj_root [file normalize "."]
+} else {
+    set prj_root [pwd]
+}
+
+puts "\[INFO\] Project root directory identified as: $prj_root"
+
+set rep_dir [file join $prj_root "syn/reports"]
+set net_dir [file join $prj_root "syn/netlists"]
+
+# Create output directories
 file mkdir $rep_dir
 file mkdir $net_dir
 
@@ -16,12 +35,12 @@ file mkdir $net_dir
 # 1. Locate Technology Timing Library
 # -----------------------------------------------------------------------------
 set lib_candidates [list \
-    "typical.lib" \
-    "./typical.lib" \
-    "../synthesis/typical.lib" \
-    "syn/typical.lib" \
     "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/typical.lib" \
     "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/gsclib090_typical.lib" \
+    [file join $prj_root "typical.lib"] \
+    [file join $prj_root "syn/typical.lib"] \
+    "typical.lib" \
+    "../synthesis/typical.lib" \
 ]
 
 set target_lib ""
@@ -33,8 +52,8 @@ foreach l $lib_candidates {
 }
 
 if {$target_lib == ""} {
-    puts "\[WARNING\] typical.lib not found in standard paths, defaulting to ./typical.lib"
-    set target_lib "typical.lib"
+    puts "\[WARNING\] typical.lib not found in standard paths, defaulting to /home/cadence/install/FOUNDRY/digital/90nm/dig/lib/typical.lib"
+    set target_lib "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/typical.lib"
 }
 
 puts "\[INFO\] Using timing library: $target_lib"
@@ -44,43 +63,48 @@ read_libs $target_lib
 # 2. Read All SystemVerilog Source Files
 # -----------------------------------------------------------------------------
 set hdl_files [list \
-    ibex_core.sv \
-    boot_rom.sv \
-    uart_rx.sv \
-    irq_ctrl.sv \
-    clint.sv \
-    crc_checker.sv \
-    transaction_guard.sv \
-    power_manager.sv \
-    payment_engine.sv \
-    audio_engine.sv \
-    sram_model.sv \
-    sram_controller.sv \
-    spi_master.sv \
-    spi_controller.sv \
-    transaction_cache.sv \
-    bus_interconnect.sv \
-    bharatvoice_top.sv \
+    [file join $prj_root "ibex_core.sv"] \
+    [file join $prj_root "boot_rom.sv"] \
+    [file join $prj_root "uart_rx.sv"] \
+    [file join $prj_root "irq_ctrl.sv"] \
+    [file join $prj_root "clint.sv"] \
+    [file join $prj_root "crc_checker.sv"] \
+    [file join $prj_root "transaction_guard.sv"] \
+    [file join $prj_root "power_manager.sv"] \
+    [file join $prj_root "payment_engine.sv"] \
+    [file join $prj_root "audio_engine.sv"] \
+    [file join $prj_root "sram_model.sv"] \
+    [file join $prj_root "sram_controller.sv"] \
+    [file join $prj_root "spi_master.sv"] \
+    [file join $prj_root "spi_controller.sv"] \
+    [file join $prj_root "transaction_cache.sv"] \
+    [file join $prj_root "bus_interconnect.sv"] \
+    [file join $prj_root "bharatvoice_top.sv"] \
 ]
 
+# Set HDL search path
+set_db init_hdl_search_path [list $prj_root [file join $prj_root "syn"] "."]
+
+puts "\[INFO\] Reading HDL source files..."
 read_hdl -language sv $hdl_files
 
 # -----------------------------------------------------------------------------
 # 3. Elaboration
 # -----------------------------------------------------------------------------
+puts "\[INFO\] Elaborating design $design..."
 elaborate $design
 current_design $design
 
 # -----------------------------------------------------------------------------
 # 4. Timing Constraints (SDC)
 # -----------------------------------------------------------------------------
-# Clock target: 50 MHz (Period = 20.0 ns)
+# Target: 50.0 MHz (Period = 20.0 ns)
 create_clock -name clk_i -period 20.0 [get_ports clk_i]
 
 set_input_delay 3.0 [remove_from_collection [all_inputs] [get_ports clk_i]] -clock [get_clocks clk_i]
 set_output_delay 3.0 [all_outputs] -clock [get_clocks clk_i]
 
-set_max_fanout 1.000 [current_design]
+set_max_fanout 16.0 [current_design]
 set_max_transition 0.5 [current_design]
 
 set_db syn_generic_effort medium
@@ -92,31 +116,31 @@ set_db syn_map_effort medium
 # -----------------------------------------------------------------------------
 puts "\[INFO\] Running syn_generic..."
 syn_generic
-write_hdl > ./${net_dir}/${design}_ti_netlist.v
+write_hdl > [file join $net_dir "${design}_ti_netlist.v"]
 
 puts "\[INFO\] Running syn_map..."
 syn_map
-write_hdl > ./${net_dir}/${design}_tm_netlist.v
+write_hdl > [file join $net_dir "${design}_tm_netlist.v"]
 
 puts "\[INFO\] Running syn_opt..."
 syn_opt
-write_hdl > ./${net_dir}/${design}_netlist.v
+write_hdl > [file join $net_dir "${design}_netlist.v"]
 
 # Export post-synthesis SDC
-write_sdc > ./${design}.sdc
-write_sdc > syn/constraints/${design}.sdc
+write_sdc > [file join $prj_root "${design}.sdc"]
+write_sdc > [file join $prj_root "syn/constraints/${design}.sdc"]
 
 # -----------------------------------------------------------------------------
 # 6. Generate Synthesis QoR Reports
 # -----------------------------------------------------------------------------
-report_area > ./${rep_dir}/${design}_area.rpt
-report_power > ./${rep_dir}/${design}_power.rpt
-report_timing > ./${rep_dir}/${design}_timing.rpt
-report_qor > ./${rep_dir}/${design}_qor.rpt
+report_area > [file join $rep_dir "${design}_area.rpt"]
+report_power > [file join $rep_dir "${design}_power.rpt"]
+report_timing > [file join $rep_dir "${design}_timing.rpt"]
+report_qor > [file join $rep_dir "${design}_qor.rpt"]
 
 puts "======================================================================="
 puts "  GENUS SYNTHESIS COMPLETED FOR $design"
-puts "  Netlist : ./${net_dir}/${design}_netlist.v"
-puts "  SDC     : ./${design}.sdc"
-puts "  Reports : ./${rep_dir}/"
+puts "  Netlist : [file join $net_dir "${design}_netlist.v"]"
+puts "  SDC     : [file join $prj_root "${design}.sdc"]"
+puts "  Reports : $rep_dir"
 puts "======================================================================="
