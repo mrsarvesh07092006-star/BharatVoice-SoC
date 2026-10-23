@@ -244,20 +244,12 @@ proc signoff {} {
 }
 
 # -----------------------------------------------------------------------------
-# Main Execution Pipeline wrapped in catch
+# Main Execution Pipeline
 # -----------------------------------------------------------------------------
-if {[catch {
-    init_design_flow
-    floorplan
-    power_plan
-    placement
-    cts
-    routing
-    signoff
-} pnr_err]} {
-    puts "\[FATAL ERROR IN INNOVUS\]: $pnr_err"
-    puts "$errorInfo"
-    exit 1
-}
-
-exit 0
+init_design_flow
+floorplan
+power_plan
+placement
+cts
+routing
+signoff

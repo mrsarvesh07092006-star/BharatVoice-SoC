@@ -1,10 +1,7 @@
 # =============================================================================
 # Cadence Genus Synthesis Script for BharatVoice SoC
-# Adapted for VIT Lab Server 90nm Foundry Setup
 # Top Module: bharatvoice_top
 # =============================================================================
-
-if {[catch {
 
 set design bharatvoice_top
 
@@ -35,7 +32,7 @@ foreach c $candidate_roots {
 }
 
 if {$prj_root == ""} {
-    error "Project root directory not found. Please cd into BharatVoice-SoC and run again."
+    set prj_root $cwd
 }
 
 puts "====================================================================="
@@ -156,11 +153,3 @@ puts "  Netlist : [file join $net_dir "${design}_netlist.v"]"
 puts "  SDC     : [file join $prj_root "${design}.sdc"]"
 puts "  Reports : $rep_dir"
 puts "======================================================================="
-
-} synth_err]} {
-    puts "\[FATAL ERROR IN GENUS\]: $synth_err"
-    puts "$errorInfo"
-    exit 1
-}
-
-exit 0

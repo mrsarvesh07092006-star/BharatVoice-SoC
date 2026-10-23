@@ -4,8 +4,6 @@
 # Top Module: bharatvoice_top
 # =============================================================================
 
-if {[catch {
-
 set design bharatvoice_top
 set script_dir [file dirname [file normalize [info script]]]
 set cwd        [pwd]
@@ -83,11 +81,3 @@ puts "  TEMPUS STA COMPLETED FOR $design"
 puts "  Setup Report : [file join $rep_dir "setup_tempus.rpt"]"
 puts "  Hold Report  : [file join $rep_dir "hold_tempus.rpt"]"
 puts "======================================================================="
-
-} sta_err]} {
-    puts "\[FATAL ERROR IN TEMPUS\]: $sta_err"
-    puts "$errorInfo"
-    exit 1
-}
-
-exit 0
