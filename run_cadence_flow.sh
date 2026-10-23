@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # =============================================================================
-# BharatVoice SoC — Automated Closed-Loop Cadence ASIC Flow & Self-Healing Loop
-# Stages: Genus (Synthesis) -> Tempus (STA) -> Innovus (PnR to GDSII)
+# BharatVoice SoC — Master 5-Tool Cadence ASIC Implementation Flow
+# Flow:
+#   [1/5] XCELIUM   : RTL Simulation & Testbench Verification
+#   [2/5] GENUS     : Logic Synthesis, Optimization & SDC Generation
+#   [3/5] CONFORMAL : Logic Equivalence Checking (RTL vs. Netlist)
+#   [4/5] TEMPUS    : Static Timing Analysis & Signoff Setup/Hold Checks
+#   [5/5] INNOVUS   : Floorplanning, PDN, Placement, CTS, NanoRoute to GDSII
+#
 # Features:
-#   1. Automatic Stage Execution & Checkpointing
-#   2. Error Log Extraction on Failure
-#   3. Automatic Git Commit & Push of Error Log
-#   4. Live Polling/Auto-Sensing of Fixes from Antigravity
-#   5. Resumption from Failed Stage (does not restart from beginning)
+#   - Automated stage-by-stage checkpointing (.cadence_state)
+#   - Error extraction & auto-push to GitHub for Antigravity self-repair
+#   - Auto-sensing watch loop (detects fixes and resumes from failed stage)
 # =============================================================================
 
 set -e
@@ -18,13 +22,13 @@ cd "$PRJ_ROOT"
 STATE_FILE="$PRJ_ROOT/.cadence_state"
 ERR_LOG="$PRJ_ROOT/cadence_flow_error.log"
 
-# Default state if not present
+# Initialize fresh state if --clean passed or no state file exists
 if [ ! -f "$STATE_FILE" ] || [ "$1" == "--clean" ]; then
-    echo "STAGE=GENUS" > "$STATE_FILE"
+    echo "STAGE=XCELIUM" > "$STATE_FILE"
     echo "STATUS=NOT_STARTED" >> "$STATE_FILE"
     echo "ATTEMPTS=0" >> "$STATE_FILE"
     rm -f "$ERR_LOG"
-    echo "[INFO] Initialized fresh flow state at Stage 1 (GENUS)."
+    echo "[INFO] Initialized flow state at Stage 1 (XCELIUM)."
 fi
 
 get_state() {
@@ -56,9 +60,8 @@ handle_error() {
     echo "" >> "$ERR_LOG"
     echo "--- EXTRACTED TOOL ERRORS ---" >> "$ERR_LOG"
     
-    # Extract error messages from log
     if [ -f "$raw_log" ]; then
-        grep -E "Error |ERROR|FATAL|\*\* Error|Cannot open|Unsupported" "$raw_log" | head -n 40 >> "$ERR_LOG" || true
+        grep -E "Error |ERROR|FATAL|\*\* Error|Cannot open|Unsupported|FAIL" "$raw_log" | head -n 40 >> "$ERR_LOG" || true
         echo "" >> "$ERR_LOG"
         echo "--- LAST 30 LINES OF EXECUTION LOG ---" >> "$ERR_LOG"
         tail -n 30 "$raw_log" >> "$ERR_LOG"
@@ -69,7 +72,6 @@ handle_error() {
     set_state "STATUS" "FAILED"
     set_state "STAGE" "$stage"
 
-    # Stage error log and push to GitHub so Antigravity can analyze & fix
     echo "[INFO] Pushing error diagnostic to GitHub for Antigravity..."
     git add "$ERR_LOG" "$STATE_FILE" "$raw_log" 2>/dev/null || git add "$ERR_LOG" "$STATE_FILE"
     git commit -m "[Auto-Report] Failure in Cadence stage: $stage - awaiting Antigravity fix" || true
@@ -80,7 +82,6 @@ handle_error() {
         echo "[WARNING] git push failed. Please verify git credentials or push manually."
     fi
 
-    # Enter Watch/Listening Loop for Antigravity's Fix
     echo ""
     echo "======================================================================="
     echo " [WATCH] Listening for Antigravity fix on branch 'main'..."
@@ -110,21 +111,55 @@ handle_error() {
 }
 
 # =============================================================================
-# Stage 1: Cadence Genus Synthesis
+# Stage 1: Cadence Xcelium Logic Simulation
+# =============================================================================
+run_xcelium() {
+    echo ""
+    echo "======================================================================="
+    echo " [STAGE 1/5] Running Cadence Xcelium Logic Simulation"
+    echo "======================================================================="
+    mkdir -p sim/logs
+    local log="sim/logs/xrun_master.log"
+
+    if [ -x "./sim/run_xcelium.sh" ]; then
+        if ./sim/run_xcelium.sh > "$log" 2>&1; then
+            echo "[SUCCESS] Xcelium RTL simulation verified 100% PASS!"
+            set_state "STAGE" "GENUS"
+            set_state "STATUS" "PASS"
+            return 0
+        else
+            handle_error "XCELIUM" "$log"
+            return 1
+        fi
+    else
+        chmod +x ./sim/run_xcelium.sh
+        if ./sim/run_xcelium.sh > "$log" 2>&1; then
+            echo "[SUCCESS] Xcelium RTL simulation verified 100% PASS!"
+            set_state "STAGE" "GENUS"
+            set_state "STATUS" "PASS"
+            return 0
+        else
+            handle_error "XCELIUM" "$log"
+            return 1
+        fi
+    fi
+}
+
+# =============================================================================
+# Stage 2: Cadence Genus Logic Synthesis
 # =============================================================================
 run_genus() {
     echo ""
     echo "======================================================================="
-    echo " [STAGE 1/3] Running Cadence Genus Logic Synthesis"
+    echo " [STAGE 2/5] Running Cadence Genus Logic Synthesis"
     echo "======================================================================="
     mkdir -p syn/reports syn/netlists
     local log="syn/reports/genus_flow.log"
 
     if genus -f syn/scripts/genus_synth.tcl -log "$log"; then
-        # Check if netlist actually produced
         if [ -f "syn/netlists/bharatvoice_top_netlist.v" ]; then
             echo "[SUCCESS] Genus synthesis completed successfully!"
-            set_state "STAGE" "TEMPUS"
+            set_state "STAGE" "CONFORMAL"
             set_state "STATUS" "PASS"
             return 0
         else
@@ -139,12 +174,47 @@ run_genus() {
 }
 
 # =============================================================================
-# Stage 2: Cadence Tempus STA (Timing Signoff)
+# Stage 3: Cadence Conformal Logic Equivalence Checking (LEC)
+# =============================================================================
+run_conformal() {
+    echo ""
+    echo "======================================================================="
+    echo " [STAGE 3/5] Running Cadence Conformal Logic Equivalence Checking"
+    echo "======================================================================="
+    mkdir -p lec
+    local log="lec/conformal.log"
+
+    if [ -x "./lec/run_conformal.sh" ]; then
+        if ./lec/run_conformal.sh > "$log" 2>&1; then
+            echo "[SUCCESS] Conformal LEC verified 100% Equivalent!"
+            set_state "STAGE" "TEMPUS"
+            set_state "STATUS" "PASS"
+            return 0
+        else
+            handle_error "CONFORMAL" "$log"
+            return 1
+        fi
+    else
+        chmod +x ./lec/run_conformal.sh
+        if ./lec/run_conformal.sh > "$log" 2>&1; then
+            echo "[SUCCESS] Conformal LEC verified 100% Equivalent!"
+            set_state "STAGE" "TEMPUS"
+            set_state "STATUS" "PASS"
+            return 0
+        else
+            handle_error "CONFORMAL" "$log"
+            return 1
+        fi
+    fi
+}
+
+# =============================================================================
+# Stage 4: Cadence Tempus STA (Timing Signoff)
 # =============================================================================
 run_tempus() {
     echo ""
     echo "======================================================================="
-    echo " [STAGE 2/3] Running Cadence Tempus Static Timing Analysis"
+    echo " [STAGE 4/5] Running Cadence Tempus Static Timing Analysis"
     echo "======================================================================="
     local log="syn/reports/tempus_flow.log"
 
@@ -160,12 +230,12 @@ run_tempus() {
 }
 
 # =============================================================================
-# Stage 3: Cadence Innovus Physical Design (PnR to GDSII)
+# Stage 5: Cadence Innovus Physical Design (PnR to GDSII)
 # =============================================================================
 run_innovus() {
     echo ""
     echo "======================================================================="
-    echo " [STAGE 3/3] Running Cadence Innovus Place & Route (PnR to GDSII)"
+    echo " [STAGE 5/5] Running Cadence Innovus Place & Route (PnR to GDSII)"
     echo "======================================================================="
     mkdir -p pnr/reports output
     local log="pnr/reports/innovus_flow.log"
@@ -188,18 +258,32 @@ run_innovus() {
 }
 
 # =============================================================================
-# Main Pipeline Dispatcher (Resumes from current STAGE in .cadence_state)
+# Pipeline Dispatcher (Resumes from current STAGE in .cadence_state)
 # =============================================================================
 CURRENT_STAGE=$(get_state "STAGE")
 
 echo "======================================================================="
-echo " BharatVoice SoC Cadence Automated ASIC Flow Runner"
+echo " BharatVoice SoC 5-Tool Cadence ASIC Workflow"
+echo " Pipeline: XCELIUM -> GENUS -> CONFORMAL -> TEMPUS -> INNOVUS"
 echo " Current Stage Resume Point: $CURRENT_STAGE"
 echo "======================================================================="
 
 case "$CURRENT_STAGE" in
+    XCELIUM)
+        run_xcelium
+        run_genus
+        run_conformal
+        run_tempus
+        run_innovus
+        ;;
     GENUS)
         run_genus
+        run_conformal
+        run_tempus
+        run_innovus
+        ;;
+    CONFORMAL)
+        run_conformal
         run_tempus
         run_innovus
         ;;
@@ -213,18 +297,22 @@ case "$CURRENT_STAGE" in
     COMPLETED)
         echo ""
         echo "======================================================================="
-        echo " ALL STAGES COMPLETED SUCCESSFULLY!"
-        echo " 1. Synthesized Netlist : syn/netlists/bharatvoice_top_netlist.v"
-        echo " 2. Timing Reports      : syn/reports/"
-        echo " 3. Tapeout GDSII File  : output/bharatvoice_top.gds"
-        echo " 4. DRC & LVS Reports   : pnr/reports/"
+        echo " ALL 5 CADENCE STAGES COMPLETED SUCCESSFULLY!"
+        echo " 1. Simulation Logs    : sim/logs/"
+        echo " 2. Synthesized Netlist: syn/netlists/bharatvoice_top_netlist.v"
+        echo " 3. LEC Report         : lec/lec_verification.rpt"
+        echo " 4. Timing Reports     : syn/reports/"
+        echo " 5. Final Tapeout GDS  : output/bharatvoice_top.gds"
+        echo " 6. DRC & LVS Reports  : pnr/reports/"
         echo "======================================================================="
         exit 0
         ;;
     *)
-        echo "[WARNING] Unknown state '$CURRENT_STAGE'. Resetting to GENUS."
-        set_state "STAGE" "GENUS"
+        echo "[WARNING] Unknown state '$CURRENT_STAGE'. Resetting to XCELIUM."
+        set_state "STAGE" "XCELIUM"
+        run_xcelium
         run_genus
+        run_conformal
         run_tempus
         run_innovus
         ;;
@@ -232,11 +320,10 @@ esac
 
 echo ""
 echo "======================================================================="
-echo " CADENCE ASIC FLOW FINISHED WITH 100% SUCCESS!"
-echo " Output GDSII: output/bharatvoice_top.gds"
+echo " COMPLETE 5-TOOL CADENCE ASIC FLOW FINISHED WITH 100% SUCCESS!"
+echo " Tapeout GDSII generated at: output/bharatvoice_top.gds"
 echo "======================================================================="
 
-# Final push of results and reports to GitHub
-git add syn/reports/ pnr/reports/ output/ .cadence_state 2>/dev/null || true
-git commit -m "[Cadence-Signoff] Full flow completed from Genus to GDSII cleanly" || true
+git add sim/logs/ syn/reports/ syn/netlists/ lec/ pnr/reports/ output/ .cadence_state 2>/dev/null || true
+git commit -m "[Cadence-Signoff] 5-Tool Cadence workflow (Xcelium->Genus->Conformal->Tempus->Innovus) verified cleanly" || true
 git push origin main || true
