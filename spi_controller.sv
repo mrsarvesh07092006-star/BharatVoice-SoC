@@ -102,17 +102,6 @@ module spi_controller #(
     assign cs_n_o     = reg_cs_force_high ? 1'b1 : core_cs_n;
     assign irq_done_o = core_done && reg_irq_en;
 
-    // Latch RX data and IRQ status on completion
-    always_ff @(posedge clk_i or negedge rst_ni) begin
-        if (!rst_ni) begin
-            reg_rx_data <= '0;
-            reg_irq_sts <= 1'b0;
-        end else if (core_done) begin
-            reg_rx_data <= core_rx_data;
-            if (reg_irq_en) reg_irq_sts <= 1'b1;
-        end
-    end
-
     // =========================================================================
     // OBI Slave Register Interface (Single-cycle latency)
     // =========================================================================
@@ -135,12 +124,20 @@ module spi_controller #(
             reg_cpha          <= 1'b0;
             spi_start_pulse   <= 1'b0;
             reg_tx_data       <= '0;
+            reg_rx_data       <= '0;
             reg_clk_div       <= 16'd4; // Default sys_clk / 4
             reg_cs_force_high <= 1'b0;
             reg_irq_en        <= 1'b1;
+            reg_irq_sts       <= 1'b0;
         end else begin
             spi_start_pulse <= 1'b0; // 1-cycle auto-clearing pulse
             resp_pending_q  <= req_i;
+
+            // Core status capture
+            if (core_done) begin
+                reg_rx_data <= core_rx_data;
+                if (reg_irq_en) reg_irq_sts <= 1'b1;
+            end
 
             if (req_i) begin
                 resp_err_q <= 1'b0;

@@ -109,6 +109,9 @@ module uart_rx #(
     logic [2:0] bit_cnt;
     logic [7:0] rx_shift;
 
+    wire sw_rx_clr  = req_i && we_i && (addr_i[7:0] == REG_CTRL) && be_i[0] && wdata_i[1];
+    wire sw_irq_clr = req_i && we_i && (addr_i[7:0] == REG_IRQ_STS) && be_i[0] && wdata_i[0];
+
     always_ff @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin
             state_q      <= ST_IDLE;
@@ -123,6 +126,15 @@ module uart_rx #(
             reg_irq_sts  <= 1'b0;
         end else begin
             rx_valid_o <= 1'b0; // 1-cycle pulse default
+
+            // Software register clear signals
+            if (sw_rx_clr) begin
+                reg_rx_valid <= 1'b0;
+                reg_rx_err   <= 1'b0;
+            end
+            if (sw_irq_clr) begin
+                reg_irq_sts <= 1'b0;
+            end
 
             if (tick_16x && reg_en) begin
                 unique case (state_q)
@@ -230,10 +242,6 @@ module uart_rx #(
                         REG_CTRL: begin
                             if (be_i[0]) begin
                                 reg_en <= wdata_i[0];
-                                if (wdata_i[1]) begin // rx_clear
-                                    reg_rx_valid <= 1'b0;
-                                    reg_rx_err   <= 1'b0;
-                                end
                             end
                         end
                         REG_BAUD_DIV: begin
@@ -242,9 +250,6 @@ module uart_rx #(
                         end
                         REG_IRQ_EN: begin
                             if (be_i[0]) reg_irq_en <= wdata_i[0];
-                        end
-                        REG_IRQ_STS: begin
-                            if (be_i[0] && wdata_i[0]) reg_irq_sts <= 1'b0; // RW1C
                         end
                         default: ;
                     endcase

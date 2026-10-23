@@ -69,40 +69,11 @@ module power_manager (
     end
     wire uart_wake_event = (uart_q2 && !uart_q1); // Falling edge
 
-    // Sleep / Wakeup State Logic
-    always_ff @(posedge clk_i or negedge rst_ni) begin
-        if (!rst_ni) begin
-            reg_active      <= 1'b1;
-            reg_sleep       <= 1'b0;
-            reg_wakeup_pend <= 1'b0;
-            reg_sleep_cnt   <= 32'd0;
-            irq_wakeup_o    <= 1'b0;
-        end else begin
-            irq_wakeup_o <= 1'b0; // default pulse
-
-            if (reg_sleep) begin
-                reg_sleep_cnt <= reg_sleep_cnt + 32'd1;
-
-                // Wakeup condition check
-                if ((reg_wakeup_src[0] && uart_wake_event) ||
-                    (reg_wakeup_src[1] && spi_activity_i)) begin
-                    reg_sleep       <= 1'b0;
-                    reg_active      <= 1'b1;
-                    reg_wakeup_pend <= 1'b1;
-                    if (reg_irq_en) begin
-                        irq_wakeup_o <= 1'b1;
-                        reg_irq_sts  <= 1'b1;
-                    end
-                end
-            end
-        end
-    end
-
     // clk_en_o stays high whenever active or when waking up
     assign clk_en_o = reg_active || !reg_sleep;
 
     // =========================================================================
-    // OBI Slave Register Interface (Single-cycle latency)
+    // OBI Slave Register Interface & Power State Engine (Unified Single Process)
     // =========================================================================
     logic        resp_pending_q;
     logic [31:0] resp_rdata_q;
@@ -115,14 +86,36 @@ module power_manager (
 
     always_ff @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin
-            resp_pending_q <= 1'b0;
-            resp_rdata_q   <= 32'd0;
-            resp_err_q     <= 1'b0;
-            reg_wakeup_src <= 2'b01; // UART wake enabled by default
-            reg_irq_en     <= 1'b1;
-            reg_irq_sts    <= 1'b0;
+            resp_pending_q  <= 1'b0;
+            resp_rdata_q    <= 32'd0;
+            resp_err_q      <= 1'b0;
+            reg_active      <= 1'b1;
+            reg_sleep       <= 1'b0;
+            reg_wakeup_pend <= 1'b0;
+            reg_sleep_cnt   <= 32'd0;
+            irq_wakeup_o    <= 1'b0;
+            reg_wakeup_src  <= 2'b01; // UART wake enabled by default
+            reg_irq_en      <= 1'b1;
+            reg_irq_sts     <= 1'b0;
         end else begin
             resp_pending_q <= req_i;
+            irq_wakeup_o   <= 1'b0; // default pulse
+
+            // Sleep counter & hardware wakeup condition check
+            if (reg_sleep) begin
+                reg_sleep_cnt <= reg_sleep_cnt + 32'd1;
+
+                if ((reg_wakeup_src[0] && uart_wake_event) ||
+                    (reg_wakeup_src[1] && spi_activity_i)) begin
+                    reg_sleep       <= 1'b0;
+                    reg_active      <= 1'b1;
+                    reg_wakeup_pend <= 1'b1;
+                    if (reg_irq_en) begin
+                        irq_wakeup_o <= 1'b1;
+                        reg_irq_sts  <= 1'b1;
+                    end
+                end
+            end
             if (req_i) begin
                 resp_err_q <= 1'b0;
                 unique case (addr_i[7:0])

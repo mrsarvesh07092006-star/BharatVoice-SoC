@@ -151,7 +151,12 @@ module audio_engine (
         endcase
     end
 
-    // Audio Playback & Token Stepping Engine
+    wire sw_play_start = req_i && we_i && (addr_i[7:0] == REG_AUD_CTRL) && be_i[0] && wdata_i[0];
+    wire sw_play_stop  = req_i && we_i && (addr_i[7:0] == REG_AUD_CTRL) && be_i[0] && wdata_i[1];
+    wire sw_amount_wr  = req_i && we_i && (addr_i[7:0] == REG_AUD_AMOUNT);
+    wire sw_irq_clr    = req_i && we_i && (addr_i[7:0] == REG_AUD_IRQ_STATUS) && be_i[0] && wdata_i[0];
+
+    // Audio Playback & Token Stepping Engine (Single Unified Driver)
     always_ff @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin
             aud_state          <= AUD_IDLE;
@@ -170,6 +175,19 @@ module audio_engine (
         end else begin
             irq_done_o <= 1'b0; // default pulse
 
+            // Software IRQ status clear
+            if (sw_irq_clr) begin
+                reg_irq_sts <= 1'b0;
+            end
+
+            // Software amount write
+            if (sw_amount_wr) begin
+                if (be_i[0]) reg_amount[ 7: 0] <= wdata_i[ 7: 0];
+                if (be_i[1]) reg_amount[15: 8] <= wdata_i[15: 8];
+                if (be_i[2]) reg_amount[23:16] <= wdata_i[23:16];
+                if (be_i[3]) reg_amount[31:24] <= wdata_i[31:24];
+            end
+
             // Hardware trigger from Payment Engine
             if (amount_valid_i) begin
                 reg_amount <= amount_i;
@@ -180,6 +198,17 @@ module audio_engine (
                 duration_cnt       <= 20'd0;
                 tone_cnt           <= 16'd0;
                 aud_state          <= AUD_PLAY;
+            end else if (sw_play_start) begin
+                decompose_amount(reg_amount, token_seq, token_len);
+                reg_token_ptr      <= 4'd0;
+                reg_status_playing <= 1'b1;
+                reg_status_done    <= 1'b0;
+                duration_cnt       <= 20'd0;
+                tone_cnt           <= 16'd0;
+                aud_state          <= AUD_PLAY;
+            end else if (sw_play_stop) begin
+                reg_status_playing <= 1'b0;
+                aud_state          <= AUD_IDLE;
             end else begin
                 unique case (aud_state)
                     AUD_IDLE: begin
@@ -309,30 +338,10 @@ module audio_engine (
                         REG_AUD_CTRL: begin
                             if (be_i[0]) begin
                                 reg_ctrl_repeat <= wdata_i[2];
-                                if (wdata_i[0]) begin // SW start
-                                    decompose_amount(reg_amount, token_seq, token_len);
-                                    reg_token_ptr      <= 4'd0;
-                                    reg_status_playing <= 1'b1;
-                                    reg_status_done    <= 1'b0;
-                                    aud_state          <= AUD_PLAY;
-                                end
-                                if (wdata_i[1]) begin // SW stop
-                                    reg_status_playing <= 1'b0;
-                                    aud_state          <= AUD_IDLE;
-                                end
                             end
-                        end
-                        REG_AUD_AMOUNT: begin
-                            if (be_i[0]) reg_amount[ 7: 0] <= wdata_i[ 7: 0];
-                            if (be_i[1]) reg_amount[15: 8] <= wdata_i[15: 8];
-                            if (be_i[2]) reg_amount[23:16] <= wdata_i[23:16];
-                            if (be_i[3]) reg_amount[31:24] <= wdata_i[31:24];
                         end
                         REG_AUD_IRQ_EN: begin
                             if (be_i[0]) reg_irq_en <= wdata_i[0];
-                        end
-                        REG_AUD_IRQ_STATUS: begin
-                            if (be_i[0] && wdata_i[0]) reg_irq_sts <= 1'b0; // RW1C
                         end
                         REG_AUD_PWM_PERIOD: begin
                             if (be_i[0]) reg_pwm_period[ 7:0] <= wdata_i[ 7:0];
