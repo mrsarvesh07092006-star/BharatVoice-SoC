@@ -7,27 +7,49 @@
 set design bharatvoice_top
 
 # -----------------------------------------------------------------------------
-# 0. Automatically Determine Project Root Directory
+# 0. Automatically Locate Project Root Directory
 # -----------------------------------------------------------------------------
-set script_path [file normalize [info script]]
-set script_dir  [file dirname $script_path]
+set script_dir [file dirname [file normalize [info script]]]
+set cwd        [pwd]
 
-if {[file exists [file join $script_dir "../../bharatvoice_top.sv"]]} {
-    set prj_root [file normalize [file join $script_dir "../.."]]
-} elseif {[file exists [file join $script_dir "../bharatvoice_top.sv"]]} {
-    set prj_root [file normalize [file join $script_dir ".."]]
-} elseif {[file exists "./bharatvoice_top.sv"]} {
-    set prj_root [file normalize "."]
-} else {
-    set prj_root [pwd]
+set candidate_roots [list \
+    $cwd \
+    [file join $cwd ".."] \
+    [file join $cwd "../.."] \
+    [file join $cwd "../../.."] \
+    $script_dir \
+    [file join $script_dir ".."] \
+    [file join $script_dir "../.."] \
+    "$::env(HOME)/BharatVoice-SoC" \
+]
+
+set prj_root ""
+foreach c $candidate_roots {
+    set test_file [file normalize [file join $c "bharatvoice_top.sv"]]
+    if {[file exists $test_file]} {
+        set prj_root [file dirname $test_file]
+        break
+    }
 }
 
-puts "\[INFO\] Project root directory identified as: $prj_root"
+if {$prj_root == ""} {
+    puts "====================================================================="
+    puts "\[ERROR\] Cannot find 'bharatvoice_top.sv'!"
+    puts "Current Directory : $cwd"
+    puts "Script Directory  : $script_dir"
+    puts "Checked Locations : $candidate_roots"
+    puts "====================================================================="
+    error "Project root directory not found. Please cd into BharatVoice-SoC and run again."
+}
+
+puts "====================================================================="
+puts "\[INFO\] Found BharatVoice Project Root : $prj_root"
+puts "\[INFO\] Current Working Directory     : $cwd"
+puts "====================================================================="
 
 set rep_dir [file join $prj_root "syn/reports"]
 set net_dir [file join $prj_root "syn/netlists"]
 
-# Create output directories
 file mkdir $rep_dir
 file mkdir $net_dir
 
@@ -60,38 +82,43 @@ puts "\[INFO\] Using timing library: $target_lib"
 read_libs $target_lib
 
 # -----------------------------------------------------------------------------
-# 2. Read All SystemVerilog Source Files
+# 2. Read All SystemVerilog Source Files with Absolute Paths
 # -----------------------------------------------------------------------------
 set hdl_files [list \
-    [file join $prj_root "ibex_core.sv"] \
-    [file join $prj_root "boot_rom.sv"] \
-    [file join $prj_root "uart_rx.sv"] \
-    [file join $prj_root "irq_ctrl.sv"] \
-    [file join $prj_root "clint.sv"] \
-    [file join $prj_root "crc_checker.sv"] \
-    [file join $prj_root "transaction_guard.sv"] \
-    [file join $prj_root "power_manager.sv"] \
-    [file join $prj_root "payment_engine.sv"] \
-    [file join $prj_root "audio_engine.sv"] \
-    [file join $prj_root "sram_model.sv"] \
-    [file join $prj_root "sram_controller.sv"] \
-    [file join $prj_root "spi_master.sv"] \
-    [file join $prj_root "spi_controller.sv"] \
-    [file join $prj_root "transaction_cache.sv"] \
-    [file join $prj_root "bus_interconnect.sv"] \
-    [file join $prj_root "bharatvoice_top.sv"] \
+    [file normalize [file join $prj_root "ibex_core.sv"]] \
+    [file normalize [file join $prj_root "boot_rom.sv"]] \
+    [file normalize [file join $prj_root "uart_rx.sv"]] \
+    [file normalize [file join $prj_root "irq_ctrl.sv"]] \
+    [file normalize [file join $prj_root "clint.sv"]] \
+    [file normalize [file join $prj_root "crc_checker.sv"]] \
+    [file normalize [file join $prj_root "transaction_guard.sv"]] \
+    [file normalize [file join $prj_root "power_manager.sv"]] \
+    [file normalize [file join $prj_root "payment_engine.sv"]] \
+    [file normalize [file join $prj_root "audio_engine.sv"]] \
+    [file normalize [file join $prj_root "sram_model.sv"]] \
+    [file normalize [file join $prj_root "sram_controller.sv"]] \
+    [file normalize [file join $prj_root "spi_master.sv"]] \
+    [file normalize [file join $prj_root "spi_controller.sv"]] \
+    [file normalize [file join $prj_root "transaction_cache.sv"]] \
+    [file normalize [file join $prj_root "bus_interconnect.sv"]] \
+    [file normalize [file join $prj_root "bharatvoice_top.sv"]] \
 ]
 
-# Set HDL search path
-set_db init_hdl_search_path [list $prj_root [file join $prj_root "syn"] "."]
+puts "\[INFO\] Checking and Reading SystemVerilog files:"
+foreach f $hdl_files {
+    if {[file exists $f]} {
+        puts "  \[EXISTS\] $f"
+    } else {
+        puts "  \[MISSING\] $f"
+    }
+}
 
-puts "\[INFO\] Reading HDL source files..."
 read_hdl -language sv $hdl_files
 
 # -----------------------------------------------------------------------------
 # 3. Elaboration
 # -----------------------------------------------------------------------------
-puts "\[INFO\] Elaborating design $design..."
+puts "\[INFO\] Elaborating top design: $design..."
 elaborate $design
 current_design $design
 
