@@ -4,6 +4,8 @@
 # Top Module: bharatvoice_top
 # =============================================================================
 
+if {[catch {
+
 set design bharatvoice_top
 
 # -----------------------------------------------------------------------------
@@ -33,12 +35,6 @@ foreach c $candidate_roots {
 }
 
 if {$prj_root == ""} {
-    puts "====================================================================="
-    puts "\[ERROR\] Cannot find 'bharatvoice_top.sv'!"
-    puts "Current Directory : $cwd"
-    puts "Script Directory  : $script_dir"
-    puts "Checked Locations : $candidate_roots"
-    puts "====================================================================="
     error "Project root directory not found. Please cd into BharatVoice-SoC and run again."
 }
 
@@ -74,7 +70,6 @@ foreach l $lib_candidates {
 }
 
 if {$target_lib == ""} {
-    puts "\[WARNING\] typical.lib not found in standard paths, defaulting to /home/cadence/install/FOUNDRY/digital/90nm/dig/lib/typical.lib"
     set target_lib "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/typical.lib"
 }
 
@@ -104,15 +99,7 @@ set hdl_files [list \
     [file normalize [file join $prj_root "bharatvoice_top.sv"]] \
 ]
 
-puts "\[INFO\] Checking and Reading SystemVerilog files:"
-foreach f $hdl_files {
-    if {[file exists $f]} {
-        puts "  \[EXISTS\] $f"
-    } else {
-        puts "  \[MISSING\] $f"
-    }
-}
-
+puts "\[INFO\] Reading SystemVerilog files..."
 read_hdl -language sv $hdl_files
 
 # -----------------------------------------------------------------------------
@@ -125,9 +112,7 @@ current_design $design
 # -----------------------------------------------------------------------------
 # 4. Timing Constraints (SDC)
 # -----------------------------------------------------------------------------
-# Target: 50.0 MHz (Period = 20.0 ns)
 create_clock -name clk_i -period 20.0 [get_ports clk_i]
-
 set_input_delay 3.0 [remove_from_collection [all_inputs] [get_ports clk_i]] -clock [get_clocks clk_i]
 set_output_delay 3.0 [all_outputs] -clock [get_clocks clk_i]
 
@@ -171,3 +156,11 @@ puts "  Netlist : [file join $net_dir "${design}_netlist.v"]"
 puts "  SDC     : [file join $prj_root "${design}.sdc"]"
 puts "  Reports : $rep_dir"
 puts "======================================================================="
+
+} synth_err]} {
+    puts "\[FATAL ERROR IN GENUS\]: $synth_err"
+    puts "$errorInfo"
+    exit 1
+}
+
+exit 0
