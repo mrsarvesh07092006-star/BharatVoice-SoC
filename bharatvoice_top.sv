@@ -143,6 +143,9 @@ logic [N_PERIPHERALS-1:0] sl_err;
 // Payment → Audio: validated amount trigger
 logic [31:0] payment_amount;
 logic        payment_valid;
+// UART RX → Payment Engine byte stream
+logic [ 7:0] uart_byte_data;
+logic        uart_byte_valid;
 // Power manager: clock-gate enable
 logic        clk_en;
 
@@ -434,13 +437,9 @@ power_manager u_power_manager (
 );
 
 // =============================================================================
-// [STUB] UART RX  — peripheral index 8
-// Parses serial byte stream from uart_rx_i and forwards bytes to
-// payment_engine. Replace with real uart_rx.sv when available.
+// [REAL] UART RX  — peripheral index 8
+// Parses serial byte stream from uart_rx_i and forwards bytes to payment_engine.
 // =============================================================================
-logic [7:0] uart_byte_data;
-logic       uart_byte_valid;
-
 uart_rx #(
     .CLK_FREQ_HZ (50_000_000),
     .BAUD_RATE   (115200    )

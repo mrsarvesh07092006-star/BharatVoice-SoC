@@ -1,152 +1,242 @@
-# ==============================================================================
-# Cadence Innovus Physical Design (PnR) Implementation Script
-# Project : BharatVoice Payment Announcement SoC
-# Target  : 50 MHz, Multi-Metal Layer Standard Cell Flow
-# File    : pnr/scripts/innovus_pnr.tcl
-# ==============================================================================
+# =============================================================================
+# Cadence Innovus Physical Design (PnR) Script for BharatVoice SoC
+# Adapted for VIT Lab Server 90nm Foundry Setup
+# Top Module: bharatvoice_top
+# =============================================================================
 
-puts "======================================================================"
-puts "Starting Cadence Innovus Place & Route Flow for BharatVoice SoC..."
-puts "======================================================================"
+# -----------------------------------------------------------------------------
+# 1. Design Initialization & MMMC Setup
+# -----------------------------------------------------------------------------
+proc init_design_flow {} {
+    global init_lef_file
+    global init_verilog
+    global init_top_cell
 
-# Create output directories
-file mkdir pnr/reports
-file mkdir pnr/outputs
+    # Read physical libraries (90nm Foundry LEF files)
+    set init_lef_file {
+        /home/cadence/install/FOUNDRY/digital/90nm/dig/lef/gsclib090_translated.lef
+        /home/cadence/install/FOUNDRY/digital/90nm/dig/lef/gsclib090_tech.lef
+    }
 
-# ------------------------------------------------------------------------------
-# 1. Design Import & Initialization
-# ------------------------------------------------------------------------------
-set init_gnd_net VSS
-set init_pwr_net VDD
-set init_verilog "syn/outputs/bharatvoice_synth.v"
-set init_top_cell "bharatvoice_top"
-set init_mmmc_file "pnr/scripts/mmmc.view"
+    # Locate synthesized gate-level netlist
+    if {[file exists ./syn/netlists/bharatvoice_top_netlist.v]} {
+        set init_verilog ./syn/netlists/bharatvoice_top_netlist.v
+    } elseif {[file exists ./netlists/bharatvoice_top_netlist.v]} {
+        set init_verilog ./netlists/bharatvoice_top_netlist.v
+    } elseif {[file exists ../synthesis/netlists/bharatvoice_top_netlist.v]} {
+        set init_verilog ../synthesis/netlists/bharatvoice_top_netlist.v
+    } else {
+        set init_verilog ./syn/netlists/bharatvoice_top_netlist.v
+    }
 
-# Initialize design with technology LEF and gate-level netlist
-init_design
+    set init_top_cell bharatvoice_top
 
-# Connect global power and ground nets
-globalNetConnect VDD -type pgpin -pin VDD -inst *
-globalNetConnect VSS -type pgpin -pin VSS -inst *
-globalNetConnect VDD -type tiehi -inst *
-globalNetConnect VSS -type tielo -inst *
+    set ::init_pwr_net {VDD}
+    set ::init_gnd_net {VSS}
 
-# ------------------------------------------------------------------------------
-# 2. Floorplanning & Die Area Budgeting
-# ------------------------------------------------------------------------------
-puts "--> Step 2: Creating Floorplan..."
-# Aspect Ratio = 1.0 (Square Die), Target Utilization = 70% (0.70)
-# Core-to-Die Margins = 15 um (Left, Bottom, Right, Top) for Power Rings
-floorPlan -r 1.0 0.70 15.0 15.0 15.0 15.0
+    # Locate timing libraries (.lib)
+    set slow_candidates [list "../synthesis/slow.lib" "./syn/slow.lib" "./slow.lib" "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/slow.lib"]
+    set typ_candidates  [list "../synthesis/typical.lib" "./syn/typical.lib" "./typical.lib" "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/typical.lib"]
+    set fast_candidates [list "../synthesis/fast.lib" "./syn/fast.lib" "./fast.lib" "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/fast.lib"]
 
-# Legalize and distribute IO boundary pins
-editPin -pin * -spreadType start -edge top -spacing 2.0
+    set slow_file [lindex $slow_candidates 0]
+    foreach f $slow_candidates { if {[file exists $f]} { set slow_file $f; break } }
 
-# ------------------------------------------------------------------------------
-# 3. Power Planning (Power Distribution Network - PDN)
-# ------------------------------------------------------------------------------
-puts "--> Step 3: Constructing Power Distribution Network (Rings & Stripes)..."
+    set typ_file [lindex $typ_candidates 0]
+    foreach f $typ_candidates { if {[file exists $f]} { set typ_file $f; break } }
 
-# Add Core Power Rings (M5 / M6)
-addRing -nets {VDD VSS} \
-        -type core_rings \
-        -follow core \
-        -layer {top Metal6 bottom Metal6 left Metal5 right Metal5} \
-        -width 2.0 \
-        -spacing 1.0 \
-        -offset 2.0
+    set fast_file [lindex $fast_candidates 0]
+    foreach f $fast_candidates { if {[file exists $f]} { set fast_file $f; break } }
 
-# Add Vertical and Horizontal Power Stripes (M5) for low IR-drop mesh
-addStripe -nets {VDD VSS} \
-          -layer Metal5 \
-          -direction vertical \
-          -width 1.5 \
-          -spacing 1.0 \
-          -set_to_set_distance 25.0 \
-          -start_offset 10.0
+    # Locate SDC constraints
+    if {[file exists ./bharatvoice_top.sdc]} {
+        set sdc_file ./bharatvoice_top.sdc
+    } elseif {[file exists ./syn/constraints/bharatvoice.sdc]} {
+        set sdc_file ./syn/constraints/bharatvoice.sdc
+    } elseif {[file exists ../synthesis/bharatvoice_top.sdc]} {
+        set sdc_file ../synthesis/bharatvoice_top.sdc
+    } else {
+        set sdc_file ./syn/constraints/bharatvoice.sdc
+    }
 
-# Special Route (sroute) for Standard Cell Follow-Pin Power Rails (M1)
-sroute -connect {corePin} \
-       -nets {VDD VSS} \
-       -layerChangeRange {Metal1 Metal6}
+    # Timing libraries
+    create_library_set -name slow_lib    -timing [list $slow_file]
+    create_library_set -name typical_lib -timing [list $typ_file]
+    create_library_set -name fast_lib    -timing [list $fast_file]
 
-# ------------------------------------------------------------------------------
-# 4. Standard Cell Placement & Pre-CTS Optimization
-# ------------------------------------------------------------------------------
-puts "--> Step 4: Placing Standard Cells..."
-setPlaceMode -prerouteAddSlackThreshold 0.1
-setPlaceMode -timingDriven true
-setPlaceMode -congEffort high
+    # Constraint modes
+    create_constraint_mode -name func_mode -sdc_files [list $sdc_file]
 
-place_opt_design
+    # Delay corners
+    create_delay_corner -name slow_corner    -library_set slow_lib
+    create_delay_corner -name typical_corner -library_set typical_lib
+    create_delay_corner -name fast_corner    -library_set fast_lib
 
-# Check post-placement timing
-timeDesign -preCTS -outDir pnr/reports/preCTS_timing
+    # Analysis views
+    create_analysis_view -name slow_view    -constraint_mode func_mode -delay_corner slow_corner
+    create_analysis_view -name typical_view -constraint_mode func_mode -delay_corner typical_corner
+    create_analysis_view -name fast_view    -constraint_mode func_mode -delay_corner fast_corner
 
-# ------------------------------------------------------------------------------
-# 5. Clock Tree Synthesis (CTS) via CCOpt
-# ------------------------------------------------------------------------------
-puts "--> Step 5: Synthesizing Clock Tree (CCOpt)..."
-create_ccopt_clock_tree_spec -file pnr/outputs/ccopt.spec
-source pnr/outputs/ccopt.spec
+    # Initialize design
+    init_design -setup slow_view -hold fast_view
 
-set_ccopt_property target_skew 0.050
-set_ccopt_property target_max_trans 0.150
-ccopt_design
+    # Set active views
+    set_analysis_view -setup {slow_view} -hold {fast_view}
 
-# Check post-CTS timing and clock metrics
-timeDesign -postCTS -outDir pnr/reports/postCTS_timing
-report_ccopt_clock_trees -file pnr/reports/innovus_cts.rpt
+    # Basic checks
+    checkDesign -all
 
-# ------------------------------------------------------------------------------
-# 6. Detailed Routing (NanoRoute)
-# ------------------------------------------------------------------------------
-puts "--> Step 6: Detailed Routing with NanoRoute..."
-setNanoRouteMode -quiet -routeWithTimingDriven true
-setNanoRouteMode -quiet -routeWithSiDriven true
-setNanoRouteMode -quiet -drouteFixAntenna true
-setNanoRouteMode -quiet -routeInsertAntennaDiode true
+    # Save checkpoint
+    saveDesign 01_init
+}
 
-routeDesign
+# -----------------------------------------------------------------------------
+# 2. Floorplanning & Pin Placement
+# -----------------------------------------------------------------------------
+proc floorplan {} {
+    # 70% utilization, aspect ratio 1.0 (square die), 10.15 um core margins
+    floorPlan -site gsclib090site -r 1.0 0.70 10.15 10.15 10.15 10.15
 
-# ------------------------------------------------------------------------------
-# 7. Post-Route Timing Optimization & Closure
-# ------------------------------------------------------------------------------
-puts "--> Step 7: Performing Post-Route Timing Optimization..."
-optDesign -postRoute
-optDesign -postRoute -hold
+    # Top Pins: System Clock and Active-Low Reset
+    editPin -pinWidth 0.12 -pinDepth 0.585 -fixOverlap 1 -spreadDirection clockwise -side Top -layer 1 -spreadType side \
+        -pin {clk_i rst_ni}
 
-timeDesign -postRoute -outDir pnr/reports/postRoute_timing
-timeDesign -postRoute -hold -outDir pnr/reports/postRoute_hold_timing
+    # Bottom Pins: Audio PWM output and Power Manager handshake
+    editPin -fixOverlap 1 -spreadDirection clockwise -side Bottom -layer 1 -spreadType side \
+        -pin {audio_pwm_o audio_sd_o pwr_sleep_req_o pwr_ack_i}
 
-# ------------------------------------------------------------------------------
-# 8. Physical Verification: Filler Cell Insertion, DRC, and LVS
-# ------------------------------------------------------------------------------
-puts "--> Step 8: Adding Filler Cells & Running Physical Verification (DRC/LVS)..."
-addFiller -cell {FILL64 FILL32 FILL16 FILL8 FILL4 FILL2 FILL1} -prefix FILLER_
+    # Left Pins: UART Telemetry Receiver and Interrupts
+    editPin -fixOverlap 1 -spreadDirection clockwise -side Left -layer 2 -spreadType side \
+        -pin {uart_rx_i ext_irq_i timer_irq_o}
 
-# Verify Design Rules (DRC)
-verify_drc -report pnr/reports/innovus_drc.rpt -limit 1000
+    # Right Pins: SPI Master interface (SCK, CS_N, MOSI, MISO)
+    editPin -fixOverlap 1 -spreadDirection clockwise -side Right -layer 2 -spreadType side \
+        -pin {spi_sck_o spi_cs_n_o spi_mosi_o spi_miso_i}
 
-# Verify Connectivity (LVS Netlist Match)
-verify_connectivity -report pnr/reports/innovus_lvs.rpt -type all -error 1000
+    saveDesign bharatvoice_top
+}
 
-# Verify Metal Density
-verify_metal_density -report pnr/reports/innovus_density.rpt
+# -----------------------------------------------------------------------------
+# 3. Power Distribution Network (PDN)
+# -----------------------------------------------------------------------------
+proc power_plan {} {
+    globalNetConnect VDD -type pgpin -pin VDD -all
+    globalNetConnect VSS -type pgpin -pin VSS -all
 
-# ------------------------------------------------------------------------------
-# 9. GDSII Export & Design Archival
-# ------------------------------------------------------------------------------
-puts "--> Step 9: Exporting GDSII Stream..."
-streamOut pnr/outputs/bharatvoice.gds \
-          -mapFile "pnr/scripts/gds2.map" \
-          -libName "BharatVoiceLib" \
-          -structureName "bharatvoice_top" \
-          -stripes 1 \
-          -units 1000
+    # Core Power Rings (M3 Horizontal, M4 Vertical)
+    addRing -nets {VDD VSS} -type core_rings -follow core \
+        -layer {top Metal3 bottom Metal3 left Metal4 right Metal4} \
+        -width {top 1.8 bottom 1.8 left 1.8 right 1.8} \
+        -spacing {top 1.8 bottom 1.8 left 1.8 right 1.8} \
+        -offset {top 1.8 bottom 1.8 left 1.8 right 1.8} \
+        -center 0 -threshold 0 -jog_distance 0 -snap_wire_center_to_grid None
 
-saveDesign pnr/outputs/bharatvoice_final.enc
+    # Horizontal Power Stripes (M3)
+    addStripe -nets {VDD VSS} -layer Metal3 -direction horizontal -width 1.8 -spacing 1.8 \
+        -set_to_set_distance 20 -start_from bottom -start_offset 10 -switch_layer_over_obs false \
+        -max_same_layer_jog_length 2 -padcore_ring_top_layer_limit Metal9 -padcore_ring_bottom_layer_limit Metal1 \
+        -block_ring_top_layer_limit Metal9 -block_ring_bottom_layer_limit Metal1 -use_wire_group 0 -snap_wire_center_to_grid None
 
-puts "======================================================================"
-puts "Cadence Innovus Back-End Implementation Completed Cleanly!"
-puts "======================================================================"
+    # Vertical Power Stripes (M4)
+    addStripe -nets {VDD VSS} -layer Metal4 -direction vertical -width 1.8 -spacing 1.8 \
+        -set_to_set_distance 20 -start_from left -start_offset 10 -switch_layer_over_obs false \
+        -max_same_layer_jog_length 2 -padcore_ring_top_layer_limit Metal9 -padcore_ring_bottom_layer_limit Metal1 \
+        -block_ring_top_layer_limit Metal9 -block_ring_bottom_layer_limit Metal1 -use_wire_group 0 -snap_wire_center_to_grid None
+
+    saveDesign bharatvoice_top
+
+    # Special Route (Standard Cell M1 Follow-Pin Rails)
+    setSrouteMode -viaConnectToShape { noshape }
+    sroute -connect { blockPin padPin padRing corePin floatingStripe } \
+        -layerChangeRange { Metal1(1) Metal5(5) } \
+        -blockPinTarget { nearestTarget } \
+        -padPinPortConnect { allPort oneGeom } \
+        -padPinTarget { nearestTarget } \
+        -corePinTarget { firstAfterRowEnd } \
+        -floatingStripeTarget { blockring padring ring stripe ringpin blockpin followpin } \
+        -allowJogging 1 \
+        -crossoverViaLayerRange { Metal1(1) Metal9(9) } \
+        -nets { VDD VSS } \
+        -allowLayerChange 1 \
+        -blockPin useLef \
+        -targetViaLayerRange { Metal1(1) Metal9(9) }
+}
+
+# -----------------------------------------------------------------------------
+# 4. Standard Cell Placement
+# -----------------------------------------------------------------------------
+proc placement {} {
+    place_design
+    saveDesign bharatvoice_top
+}
+
+# -----------------------------------------------------------------------------
+# 5. Clock Tree Synthesis (CCOpt)
+# -----------------------------------------------------------------------------
+proc cts {} {
+    set_ccopt_property target_max_trans 0.5
+    set_ccopt_property buffer_cells {CLKBUFX2 CLKBUFX20 CLKBUFX3 CLKBUFX4 CLKBUFX6 CLKBUFX8 CLKBUFX12 CLKBUFX16}
+    set_ccopt_property inverter_cells {CLKINVX1 CLKINVX12 CLKINVX16 CLKINVX2 CLKINV20 CLKINVX3 CLKINVX4 CLKINVX6 CLKINVX8}
+
+    # Run CCOpt Clock Tree Synthesis
+    ccopt_design -cts
+    report_ccopt_clock_trees -file cts_clock_trees.rpt
+    report_ccopt_skew_groups -file cts_skew_groups.rpt
+
+    timeDesign -postCTS -outDir ./postCTS
+    saveDesign 05_cts
+}
+
+# -----------------------------------------------------------------------------
+# 6. Detail Routing (NanoRoute)
+# -----------------------------------------------------------------------------
+proc routing {} {
+    setNanoRouteMode -quiet -routeWithTimingDriven 1
+    setNanoRouteMode -quiet -routeTdrEffort 1
+    setNanoRouteMode -quiet -routeTopRoutingLayer 7
+    setNanoRouteMode -quiet -routeBottomRoutingLayer 1
+    setNanoRouteMode -quiet -drouteEndIteration 1
+    setNanoRouteMode -quiet -routeWithTimingDriven true
+    setNanoRouteMode -quiet -routeWithSiDriven false
+    routeDesign -globalDetail
+
+    setAnalysisMode -analysisType onChipVariation -cppr both
+    routeDesign -trackopt
+    saveDesign 06_route
+}
+
+# -----------------------------------------------------------------------------
+# 7. Physical Verification & Signoff (DRC, LVS, GDSII)
+# -----------------------------------------------------------------------------
+proc signoff {} {
+    file mkdir ./output
+    file mkdir ./pnr/reports
+
+    # DRC & Connectivity checks
+    verify_drc -report ./pnr/reports/innovus_drc.rpt -limit 1000
+    verify_connectivity -type all -report ./pnr/reports/innovus_lvs.rpt
+
+    # Stream out final tapeout GDSII
+    streamOut ./output/bharatvoice_top.gds \
+        -libName bharatvoice_top \
+        -merge /home/cadence/install/FOUNDRY/digital/90nm/dig/gds/gsclib090.gds \
+        -units 1000 \
+        -mode ALL
+
+    puts "======================================================================="
+    puts "  INNOVUS PHYSICAL DESIGN COMPLETED FOR bharatvoice_top"
+    puts "  GDSII   : ./output/bharatvoice_top.gds"
+    puts "  Reports : ./pnr/reports/"
+    puts "======================================================================="
+}
+
+# -----------------------------------------------------------------------------
+# Main Execution Pipeline
+# -----------------------------------------------------------------------------
+init_design_flow
+floorplan
+power_plan
+placement
+cts
+routing
+signoff
