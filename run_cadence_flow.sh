@@ -77,10 +77,6 @@ else
         echo "[INFO] Initialized flow state at Stage 1 (XCELIUM)."
     fi
 fi
-    else
-        echo "${key}=${val}" >> "$STATE_FILE"
-    fi
-}
 
 handle_error() {
     local stage="$1"
