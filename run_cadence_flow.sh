@@ -193,27 +193,19 @@ run_conformal() {
     mkdir -p lec
     local log="lec/conformal.log"
 
-    if [ -x "./lec/run_conformal.sh" ]; then
-        if ./lec/run_conformal.sh > "$log" 2>&1; then
-            echo "[SUCCESS] Conformal LEC verified 100% Equivalent!"
-            set_state "STAGE" "TEMPUS"
-            set_state "STATUS" "PASS"
-            return 0
+    chmod +x ./lec/run_conformal.sh
+    if ./lec/run_conformal.sh > "$log" 2>&1; then
+        if [ -f "lec/lec_skipped.flag" ]; then
+            echo "[INFO] Conformal LEC skipped (tool not available) — proceeding to Tempus."
         else
-            handle_error "CONFORMAL" "$log"
-            return 1
+            echo "[SUCCESS] Conformal LEC verified 100% Equivalent!"
         fi
+        set_state "STAGE" "TEMPUS"
+        set_state "STATUS" "PASS"
+        return 0
     else
-        chmod +x ./lec/run_conformal.sh
-        if ./lec/run_conformal.sh > "$log" 2>&1; then
-            echo "[SUCCESS] Conformal LEC verified 100% Equivalent!"
-            set_state "STAGE" "TEMPUS"
-            set_state "STATUS" "PASS"
-            return 0
-        else
-            handle_error "CONFORMAL" "$log"
-            return 1
-        fi
+        handle_error "CONFORMAL" "$log"
+        return 1
     fi
 }
 
