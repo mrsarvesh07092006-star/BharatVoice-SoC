@@ -105,42 +105,9 @@ handle_error() {
     set_state "STATUS" "FAILED"
     set_state "STAGE" "$stage"
 
-    echo "[INFO] Pushing error diagnostic to GitHub for Antigravity..."
-    git add -f "$ERR_LOG" "$STATE_FILE" "$raw_log" 2>/dev/null || git add -f "$ERR_LOG" "$STATE_FILE"
-    git commit -m "[Auto-Report] Failure in Cadence stage: $stage - awaiting Antigravity fix" || true
-    
-    if git push origin main; then
-        echo "[INFO] Error log successfully pushed to GitHub."
-    else
-        echo "[WARNING] git push failed. Please verify git credentials or push manually."
-    fi
-
     echo ""
-    echo "======================================================================="
-    echo " [WATCH] Listening for Antigravity fix on branch 'main'..."
-    echo " Antigravity will detect the error, apply the fix, and commit to GitHub."
-    echo " This script will automatically resume as soon as the commit is pushed."
-    echo " (Press Ctrl+C to abort at any time)"
-    echo "======================================================================="
-
-    while true; do
-        sleep 5
-        git fetch origin main > /dev/null 2>&1 || true
-        LOCAL_REV=$(git rev-parse HEAD)
-        REMOTE_REV=$(git rev-parse origin/main)
-
-        if [ "$LOCAL_REV" != "$REMOTE_REV" ]; then
-            echo ""
-            echo ">>> [DETECTED] New fix commit received from Antigravity ($REMOTE_REV)!"
-            git pull origin main
-            echo ">>> Resuming pipeline from stage: $stage..."
-            rm -f "$ERR_LOG"
-            set_state "STATUS" "RUNNING"
-            exec "$0"
-            exit 0
-        fi
-        echo -n "."
-    done
+    echo "[ERROR] Stage $stage failed. Details written to: $ERR_LOG"
+    exit 1
 }
 
 # =============================================================================
@@ -365,7 +332,3 @@ echo "======================================================================="
 echo " COMPLETE 5-TOOL CADENCE ASIC FLOW FINISHED WITH 100% SUCCESS!"
 echo " Tapeout GDSII generated at: output/bharatvoice_top.gds"
 echo "======================================================================="
-
-git add sim/logs/ syn/reports/ syn/netlists/ lec/ pnr/reports/ output/ .cadence_state 2>/dev/null || true
-git commit -m "[Cadence-Signoff] 5-Tool Cadence workflow (Xcelium->Genus->Conformal->Tempus->Innovus) verified cleanly" || true
-git push origin main || true
