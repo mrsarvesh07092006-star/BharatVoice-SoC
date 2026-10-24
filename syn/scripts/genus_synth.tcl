@@ -5,6 +5,12 @@
 
 set design bharatvoice_top
 
+# Disable interactive paging so script runs continuously without waiting for keypress
+catch {set_attribute ui_pager none /}
+catch {set_db ui_pager none}
+catch {set_attribute max_print_message_count 100 /}
+
+
 # -----------------------------------------------------------------------------
 # 0. Automatically Locate Project Root Directory
 # -----------------------------------------------------------------------------
