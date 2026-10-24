@@ -9,8 +9,9 @@ set_units -time ns -resistance kOhm -capacitance pF -voltage V -current mA
 
 # ------------------------------------------------------------------------------
 # 1. Primary Clock Definition
+# Target: 65.6 MHz System Clock (15.24 ns period) to achieve 0-50 ps slack
 # ------------------------------------------------------------------------------
-create_clock -name clk_sys -period 20.000 -waveform {0.000 10.000} [get_ports clk_i]
+create_clock -name clk_sys -period 15.240 -waveform {0.000 7.620} [get_ports clk_i]
 
 # Clock Network Attributes
 set_clock_uncertainty -setup 0.250 [get_clocks clk_sys]

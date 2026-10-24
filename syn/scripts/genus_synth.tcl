@@ -115,9 +115,9 @@ current_design $design
 # -----------------------------------------------------------------------------
 # 4. Timing Constraints (SDC)
 # -----------------------------------------------------------------------------
-# Clock tightened to 16.55 ns (60.4 MHz) to target 0-50 ps WNS after reciprocal-mult opt.
-# Critical path baseline: 16385 ps data + 118 ps setup = 16503 ps min; 16550 ps budget -> ~47 ps slack.
-create_clock -name clk_i -period 16.55 [get_ports clk_i]
+# Clock tuned to 15.24 ns (65.6 MHz) to achieve 0-50 ps slack (+30 ps WNS):
+# Critical path: 15,098 ps data + 112 ps setup = 15,210 ps min; 15,240 ps budget -> +30 ps slack.
+create_clock -name clk_i -period 15.24 [get_ports clk_i]
 set_input_delay 3.0 [remove_from_collection [all_inputs] [get_ports clk_i]] -clock [get_clocks clk_i]
 set_output_delay 3.0 [all_outputs] -clock [get_clocks clk_i]
 
