@@ -74,53 +74,52 @@ module audio_engine (
     localparam logic [7:0] TOK_RECEIVED   = 8'd4;
     localparam logic [7:0] TOK_DIGIT_BASE = 8'd10; // 10..19 for 0..9
 
-    // Decomposition Task/Logic
-    function automatic void decompose_amount(
-        input  logic [31:0] amt_paise,
-        output logic [ 7:0] seq [0:7],
-        output logic [ 2:0] len
-    );
+    // ==========================================================================
+    // Combinational amount-to-token decomposer
+    // Drives comb_seq[] and comb_len purely with blocking = assignments in
+    // always_comb so that the always_ff below only uses <= assignments.
+    // This resolves CDFG-463 (mixed blocking/non-blocking on same variable).
+    // ==========================================================================
+    logic [7:0] comb_seq [0:7];
+    logic [2:0] comb_len;
+
+    // Decompose whichever amount is currently being latched (see always_ff mux)
+    logic [31:0] decomp_src;   // driven by always_comb mux
+    always_comb begin : u_decompose
         logic [31:0] rupees;
         logic [15:0] thousands, hundreds, tens;
         int idx;
 
-        rupees = amt_paise / 32'd100;
-        thousands = (rupees / 1000) % 100;
-        hundreds  = (rupees / 100) % 10;
-        tens      = rupees % 100;
+        // Default silence
+        for (int i = 0; i < 8; i++) comb_seq[i] = TOK_SILENCE;
+        comb_len = 3'd0;
+
+        rupees    = decomp_src / 32'd100;
+        thousands = (rupees / 32'd1000) % 32'd100;
+        hundreds  = (rupees / 32'd100)  % 32'd10;
+        tens      =  rupees             % 32'd100;
 
         idx = 0;
-        // Pre-initialize sequence array with silence (constant bounded for synthesis)
-        for (int i = 0; i < 8; i++) begin
-            seq[i] = TOK_SILENCE;
-        end
-
-        seq[0] = TOK_RUPEES;
+        comb_seq[0] = TOK_RUPEES;
         idx++;
 
         if (thousands > 0 && idx < 6) begin
-            seq[idx] = TOK_DIGIT_BASE + thousands[7:0];
-            idx++;
-            seq[idx] = TOK_THOUSAND;
-            idx++;
+            comb_seq[idx] = TOK_DIGIT_BASE + thousands[7:0]; idx++;
+            comb_seq[idx] = TOK_THOUSAND;                    idx++;
         end
 
         if (hundreds > 0 && idx < 6) begin
-            seq[idx] = TOK_DIGIT_BASE + hundreds[7:0];
-            idx++;
-            seq[idx] = TOK_HUNDRED;
-            idx++;
+            comb_seq[idx] = TOK_DIGIT_BASE + hundreds[7:0]; idx++;
+            comb_seq[idx] = TOK_HUNDRED;                    idx++;
         end
 
         if (tens > 0 && idx < 6) begin
-            seq[idx] = TOK_DIGIT_BASE + tens[7:0];
-            idx++;
+            comb_seq[idx] = TOK_DIGIT_BASE + tens[7:0]; idx++;
         end
 
-        seq[idx] = TOK_RECEIVED;
-        idx++;
-        len = idx[2:0];
-    endfunction
+        comb_seq[idx] = TOK_RECEIVED; idx++;
+        comb_len = idx[2:0];
+    end
 
     // PWM Audio Synthesizer
     logic [15:0] pwm_cnt;
@@ -156,7 +155,14 @@ module audio_engine (
     wire sw_amount_wr  = req_i && we_i && (addr_i[7:0] == REG_AUD_AMOUNT);
     wire sw_irq_clr    = req_i && we_i && (addr_i[7:0] == REG_AUD_IRQ_STATUS) && be_i[0] && wdata_i[0];
 
+    // Mux for decompose source: either hardware-triggered amount or reg_amount
+    always_comb begin
+        decomp_src = amount_valid_i ? amount_i : reg_amount;
+    end
+
     // Audio Playback & Token Stepping Engine (Single Unified Driver)
+    // NOTE: Only non-blocking (<=) assignments here – comb_seq/comb_len come
+    // from the always_comb block above to avoid CDFG-463.
     always_ff @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin
             aud_state          <= AUD_IDLE;
@@ -191,7 +197,9 @@ module audio_engine (
             // Hardware trigger from Payment Engine
             if (amount_valid_i) begin
                 reg_amount <= amount_i;
-                decompose_amount(amount_i, token_seq, token_len);
+                // Capture comb_seq/comb_len computed by always_comb above
+                for (int i = 0; i < 8; i++) token_seq[i] <= comb_seq[i];
+                token_len          <= comb_len;
                 reg_token_ptr      <= 4'd0;
                 reg_status_playing <= 1'b1;
                 reg_status_done    <= 1'b0;
@@ -199,7 +207,9 @@ module audio_engine (
                 tone_cnt           <= 16'd0;
                 aud_state          <= AUD_PLAY;
             end else if (sw_play_start) begin
-                decompose_amount(reg_amount, token_seq, token_len);
+                // decomp_src already == reg_amount from always_comb mux
+                for (int i = 0; i < 8; i++) token_seq[i] <= comb_seq[i];
+                token_len          <= comb_len;
                 reg_token_ptr      <= 4'd0;
                 reg_status_playing <= 1'b1;
                 reg_status_done    <= 1'b0;
