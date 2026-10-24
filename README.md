@@ -110,15 +110,23 @@ powershell -ExecutionPolicy Bypass -File .\run_regression.ps1
 
 ## 4. Synthesis & Physical Implementation Results
 
-### 4.1 Front-End Synthesis (Cadence Genus 21.14)
+### 4.1 Front-End Synthesis (Cadence Genus 21.14 — 90nm Standard Cell Library)
 - **Target Frequency:** 50.0 MHz ($T = 20.000\text{ ns}$)
-- **Setup Slack (WNS):** $+4.120\text{ ns}$ (**MET** — zero timing violations, $TNS = 0.000\text{ ns}$)
-- **Total Standard Cells:** 56,842 logic cells
-- **Equivalent NAND2 Gates:** 241,816 Gate Equivalents ($1.44\,\mu\text{m}^2/\text{gate}$)
-- **Total Silicon Area:** $0.513\text{ mm}^2$ ($512,840\,\mu\text{m}^2$)
-- **Total Power Dissipation:** $21.000\text{ mW}$ ($0.342\text{ mW}$ static leakage, $20.658\text{ mW}$ dynamic)
+- **Setup Slack (WNS):** $+4.789\text{ ns}$ (+4,789 ps) (**MET** — zero timing violations, $TNS = 0.000\text{ ns}$)
+- **Data Path Delay:** $15.098\text{ ns}$ (Maximum Operating Frequency $F_{max} = 65.74\text{ MHz}$)
+- **Total Standard Cells:** 29,309 cells
+- **Total Silicon Cell Area:** $330,324.781\,\mu\text{m}^2$ ($\approx 0.33\text{ mm}^2$)
+- **Reports:** [`syn/reports/bharatvoice_top_area.rpt`](syn/reports/bharatvoice_top_area.rpt), [`syn/reports/bharatvoice_top_timing.rpt`](syn/reports/bharatvoice_top_timing.rpt)
 
-### 4.2 Back-End Physical Design (Cadence Innovus 21.15)
+### 4.2 FPGA Synthesis (Intel Quartus Prime Lite 20.1 — Cyclone IV E)
+- **Target Family / Device:** Cyclone IV E (`EP4CE30F23C6`)
+- **Total Logic Elements (LEs):** 24,840 (14,523 Combinational ALUTs)
+- **Dedicated Logic Registers:** 11,396 registers
+- **Embedded Multipliers:** 2 (9-bit DSP blocks)
+- **Gate-Level Netlist:** [`syn/netlists/bharatvoice_top_quartus_netlist.v`](syn/netlists/bharatvoice_top_quartus_netlist.v) (20.7 MB, 481,273 lines)
+- **Reports:** [`quartus/bharatvoice_top.map.rpt`](quartus/bharatvoice_top.map.rpt), [`quartus/bharatvoice_top.map.summary`](quartus/bharatvoice_top.map.summary)
+
+### 4.3 Back-End Physical Design (Cadence Innovus 21.15)
 - **Die Dimensions:** $850\,\mu\text{m} \times 850\,\mu\text{m}$ ($0.7225\text{ mm}^2$ die area)
 - **Core Dimensions:** $800\,\mu\text{m} \times 800\,\mu\text{m}$ ($0.6400\text{ mm}^2$ core area)
 - **Effective Core Utilization:** $69.78\%$ (Target: $70\%$)
