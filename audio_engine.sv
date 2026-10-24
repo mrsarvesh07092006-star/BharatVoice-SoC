@@ -86,18 +86,41 @@ module audio_engine (
     // Decompose whichever amount is currently being latched (see always_ff mux)
     logic [31:0] decomp_src;   // driven by always_comb mux
     always_comb begin : u_decompose
-        logic [31:0] rupees;
-        logic [15:0] thousands, hundreds, tens;
+        // 64-bit reciprocal multiplication replaces the 120+-gate divider chain.
+        // Identities (valid for any A < 2^30):
+        //   A / 100  = (A * 1374389535) >> 37
+        //   A / 1000 = (A * 274877907)  >> 38
+        //   A / 10   = (A * 1717986919) >> 34
+        //   A % N    = A - N * (A / N)
+        logic [63:0] t0, t1, t2, t3;
+        logic [31:0] rupees, rcp_div1000, rcp_th100, rcp_div100, rcp_r10;
+        logic [31:0] thousands, hundreds, tens;
         int idx;
 
         // Default silence
         for (int i = 0; i < 8; i++) comb_seq[i] = TOK_SILENCE;
         comb_len = 3'd0;
 
-        rupees    = decomp_src / 32'd100;
-        thousands = (rupees / 32'd1000) % 32'd100;
-        hundreds  = (rupees / 32'd100)  % 32'd10;
-        tens      =  rupees             % 32'd100;
+        // rupees = decomp_src / 100
+        t0     = 64'(decomp_src) * 64'd1374389535;
+        rupees = 32'(t0 >> 37);
+
+        // thousands = (rupees / 1000) % 100
+        t1          = 64'(rupees) * 64'd274877907;
+        rcp_div1000 = 32'(t1 >> 38);
+        t2          = 64'(rcp_div1000) * 64'd1374389535;
+        rcp_th100   = 32'(t2 >> 37);
+        thousands   = rcp_div1000 - 32'd100 * rcp_th100;
+
+        // hundreds = (rupees / 100) % 10
+        t3         = 64'(rupees) * 64'd1374389535;
+        rcp_div100 = 32'(t3 >> 37);
+        t0         = 64'(rcp_div100) * 64'd1717986919;   // t0 reuse is fine in always_comb
+        rcp_r10    = 32'(t0 >> 34);
+        hundreds   = rcp_div100 - 32'd10 * rcp_r10;
+
+        // tens = rupees % 100
+        tens = rupees - 32'd100 * rcp_div100;
 
         idx = 0;
         comb_seq[0] = TOK_RUPEES;

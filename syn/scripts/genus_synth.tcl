@@ -115,9 +115,14 @@ current_design $design
 # -----------------------------------------------------------------------------
 # 4. Timing Constraints (SDC)
 # -----------------------------------------------------------------------------
-create_clock -name clk_i -period 20.0 [get_ports clk_i]
+# Clock tightened to 16.55 ns (60.4 MHz) to target 0-50 ps WNS after reciprocal-mult opt.
+# Critical path baseline: 16385 ps data + 118 ps setup = 16503 ps min; 16550 ps budget -> ~47 ps slack.
+create_clock -name clk_i -period 16.55 [get_ports clk_i]
 set_input_delay 3.0 [remove_from_collection [all_inputs] [get_ports clk_i]] -clock [get_clocks clk_i]
 set_output_delay 3.0 [all_outputs] -clock [get_clocks clk_i]
+
+# Hint Genus to infer multiplier-based constant division (reinforces reciprocal-mult RTL)
+catch {set_db hdl_divide_constant_by_multiply true}
 
 set_max_fanout 16.0 [current_design]
 set_max_transition 0.5 [current_design]
