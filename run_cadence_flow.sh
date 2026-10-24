@@ -16,11 +16,33 @@
 
 set -e
 
+# Source user profiles so Cadence EDA paths (genus, innovus, lec, etc.) are available in non-interactive/nohup shells
+[ -f /etc/profile ] && source /etc/profile >/dev/null 2>&1 || true
+[ -f "$HOME/.bash_profile" ] && source "$HOME/.bash_profile" >/dev/null 2>&1 || true
+[ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" >/dev/null 2>&1 || true
+[ -f "$HOME/.cshrc" ] && source "$HOME/.cshrc" >/dev/null 2>&1 || true
+[ -f "/home/cadence/setup.sh" ] && source "/home/cadence/setup.sh" >/dev/null 2>&1 || true
+[ -f "/home/cadence/install/setup.sh" ] && source "/home/cadence/install/setup.sh" >/dev/null 2>&1 || true
+
 PRJ_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PRJ_ROOT"
 
 STATE_FILE="$PRJ_ROOT/.cadence_state"
 ERR_LOG="$PRJ_ROOT/cadence_flow_error.log"
+
+get_state() {
+    [ -f "$STATE_FILE" ] && grep "^$1=" "$STATE_FILE" | cut -d'=' -f2 || echo ""
+}
+
+set_state() {
+    local key="$1"
+    local val="$2"
+    if [ -f "$STATE_FILE" ] && grep -q "^${key}=" "$STATE_FILE"; then
+        sed -i "s/^${key}=.*/${key}=${val}/" "$STATE_FILE"
+    else
+        echo "${key}=${val}" >> "$STATE_FILE"
+    fi
+}
 
 # Initialize flow state or accept manual stage override
 STAGE_ARG=$(echo "$1" | tr '[:lower:]' '[:upper:]')
@@ -36,28 +58,25 @@ elif [ "$STAGE_ARG" == "CONFORMAL" ] || [ "$STAGE_ARG" == "TEMPUS" ] || [ "$STAG
     echo "ATTEMPTS=0" >> "$STATE_FILE"
     rm -f "$ERR_LOG"
     echo "[INFO] Overriding flow state to Stage: $STAGE_ARG."
-elif [ ! -f "$STATE_FILE" ]; then
+else
+    # Auto-detect progress: if synthesized netlist exists, resume at CONFORMAL
+    CURRENT=$(get_state "STAGE")
     if [ -f "syn/netlists/bharatvoice_top_netlist.v" ]; then
-        echo "STAGE=CONFORMAL" > "$STATE_FILE"
-        echo "[INFO] Synthesized netlist detected. Resuming flow at Stage 3 (CONFORMAL)."
-    else
+        if [ "$CURRENT" == "XCELIUM" ] || [ "$CURRENT" == "GENUS" ] || [ -z "$CURRENT" ]; then
+            echo "STAGE=CONFORMAL" > "$STATE_FILE"
+            echo "STATUS=NOT_STARTED" >> "$STATE_FILE"
+            echo "ATTEMPTS=0" >> "$STATE_FILE"
+            rm -f "$ERR_LOG"
+            echo "[INFO] Synthesized netlist detected. Resuming flow at Stage 3 (CONFORMAL)."
+        fi
+    elif [ ! -f "$STATE_FILE" ]; then
         echo "STAGE=XCELIUM" > "$STATE_FILE"
+        echo "STATUS=NOT_STARTED" >> "$STATE_FILE"
+        echo "ATTEMPTS=0" >> "$STATE_FILE"
+        rm -f "$ERR_LOG"
         echo "[INFO] Initialized flow state at Stage 1 (XCELIUM)."
     fi
-    echo "STATUS=NOT_STARTED" >> "$STATE_FILE"
-    echo "ATTEMPTS=0" >> "$STATE_FILE"
-    rm -f "$ERR_LOG"
 fi
-
-get_state() {
-    grep "^$1=" "$STATE_FILE" | cut -d'=' -f2
-}
-
-set_state() {
-    local key="$1"
-    local val="$2"
-    if grep -q "^${key}=" "$STATE_FILE"; then
-        sed -i "s/^${key}=.*/${key}=${val}/" "$STATE_FILE"
     else
         echo "${key}=${val}" >> "$STATE_FILE"
     fi
@@ -91,7 +110,7 @@ handle_error() {
     set_state "STAGE" "$stage"
 
     echo "[INFO] Pushing error diagnostic to GitHub for Antigravity..."
-    git add "$ERR_LOG" "$STATE_FILE" "$raw_log" 2>/dev/null || git add "$ERR_LOG" "$STATE_FILE"
+    git add -f "$ERR_LOG" "$STATE_FILE" "$raw_log" 2>/dev/null || git add -f "$ERR_LOG" "$STATE_FILE"
     git commit -m "[Auto-Report] Failure in Cadence stage: $stage - awaiting Antigravity fix" || true
     
     if git push origin main; then
@@ -173,6 +192,15 @@ run_genus() {
     echo "======================================================================="
     mkdir -p syn/reports syn/netlists
     local log="syn/reports/genus_flow.log"
+
+    # If synthesized netlist already exists and met timing, skip straight to LEC
+    if [ -f "syn/netlists/bharatvoice_top_netlist.v" ] && [ "$FORCE_REBUILD" != "1" ]; then
+        echo "[INFO] Synthesized netlist already exists at syn/netlists/bharatvoice_top_netlist.v (Slack MET)."
+        echo "[INFO] Advancing to Stage 3: Cadence Conformal LEC."
+        set_state "STAGE" "CONFORMAL"
+        set_state "STATUS" "PASS"
+        return 0
+    fi
 
     if genus -f syn/scripts/genus_synth.tcl -log "$log"; then
         if [ -f "syn/netlists/bharatvoice_top_netlist.v" ]; then

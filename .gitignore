@@ -6,6 +6,7 @@ transcript
 *.vcd
 *.log
 compile.log
+!cadence_flow_error.log
 
 # Temporary & Editor files
 .vscode/
