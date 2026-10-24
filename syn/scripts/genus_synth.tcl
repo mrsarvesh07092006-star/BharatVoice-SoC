@@ -122,9 +122,34 @@ set_output_delay 3.0 [all_outputs] -clock [get_clocks clk_i]
 set_max_fanout 16.0 [current_design]
 set_max_transition 0.5 [current_design]
 
-set_db syn_generic_effort medium
-set_db syn_opt_effort medium
-set_db syn_map_effort medium
+# -----------------------------------------------------------------------------
+# 4.1 Advanced Timing & Slack Optimization Settings
+# -----------------------------------------------------------------------------
+# A. Increase synthesis and optimization effort to high
+set_db syn_generic_effort high
+set_db syn_map_effort     high
+set_db syn_opt_effort     high
+
+# B. Path grouping for critical clock domain to maximize slack
+catch {
+    define_cost_group -name clk_group
+    path_group -from [all_registers] -to [all_registers] -group clk_group
+    set_db [get_db cost_groups clk_group] .weight 10
+}
+
+# C. Enable automatic register retiming across combinational logic
+catch {
+    set_db syn_opt_retiming true
+}
+
+# D. SDC timing exceptions (False paths and Multicycle paths)
+catch {set_false_path -from [get_ports rst_ni]}
+catch {set_false_path -from [get_ports {jtag_tck_i jtag_tms_i jtag_tdi_i}]}
+catch {set_false_path -to   [get_ports jtag_tdo_o]}
+catch {
+    set_multicycle_path -setup 2 -from [get_pins -hier *u_crc_checker*] -to [get_pins -hier *u_payment_engine*]
+    set_multicycle_path -hold  1 -from [get_pins -hier *u_crc_checker*] -to [get_pins -hier *u_payment_engine*]
+}
 
 # -----------------------------------------------------------------------------
 # 5. Synthesis & Optimization Stages

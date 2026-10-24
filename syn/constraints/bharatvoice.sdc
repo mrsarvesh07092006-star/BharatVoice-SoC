@@ -28,6 +28,13 @@ set_false_path -from [get_ports {jtag_tck_i jtag_tms_i jtag_tdi_i}]
 set_false_path -to   [get_ports jtag_tdo_o]
 
 # ------------------------------------------------------------------------------
+# 2.1 Multicycle Paths
+# ------------------------------------------------------------------------------
+# Allow 2 clock cycles for CRC calculation handshake into payment engine
+set_multicycle_path -setup 2 -from [get_cells -hier *u_crc_checker*] -to [get_cells -hier *u_payment_engine*]
+set_multicycle_path -hold  1 -from [get_cells -hier *u_crc_checker*] -to [get_cells -hier *u_payment_engine*]
+
+# ------------------------------------------------------------------------------
 # 3. Input Constraints
 # ------------------------------------------------------------------------------
 # External inputs: UART RX stream and SPI MISO line

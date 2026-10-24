@@ -155,9 +155,26 @@ module audio_engine (
     wire sw_amount_wr  = req_i && we_i && (addr_i[7:0] == REG_AUD_AMOUNT);
     wire sw_irq_clr    = req_i && we_i && (addr_i[7:0] == REG_AUD_IRQ_STATUS) && be_i[0] && wdata_i[0];
 
-    // Mux for decompose source: either hardware-triggered amount or reg_amount
+    // =========================================================================
+    // Pipeline Stage 1: Hardware Trigger & Amount Register Slice
+    // Cuts the inter-module critical path from u_payment_engine (15.098 ns)
+    // =========================================================================
+    logic [31:0] hw_amount_q;
+    logic        hw_valid_q;
+
+    always_ff @(posedge clk_i or negedge rst_ni) begin
+        if (!rst_ni) begin
+            hw_amount_q <= 32'd0;
+            hw_valid_q  <= 1'b0;
+        end else begin
+            hw_amount_q <= amount_i;
+            hw_valid_q  <= amount_valid_i;
+        end
+    end
+
+    // Mux for decompose source: either hardware-triggered pipelined amount or reg_amount
     always_comb begin
-        decomp_src = amount_valid_i ? amount_i : reg_amount;
+        decomp_src = hw_valid_q ? hw_amount_q : reg_amount;
     end
 
     // Audio Playback & Token Stepping Engine (Single Unified Driver)
@@ -194,9 +211,9 @@ module audio_engine (
                 if (be_i[3]) reg_amount[31:24] <= wdata_i[31:24];
             end
 
-            // Hardware trigger from Payment Engine
-            if (amount_valid_i) begin
-                reg_amount <= amount_i;
+            // Hardware trigger from Payment Engine (Pipelined Stage 2)
+            if (hw_valid_q) begin
+                reg_amount <= hw_amount_q;
                 // Capture comb_seq/comb_len computed by always_comb above
                 for (int i = 0; i < 8; i++) token_seq[i] <= comb_seq[i];
                 token_len          <= comb_len;
