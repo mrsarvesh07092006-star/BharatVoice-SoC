@@ -123,13 +123,13 @@ proc floorplan {} {
         -pin {clk_i rst_ni}
 
     editPin -fixOverlap 1 -spreadDirection clockwise -side Bottom -layer 1 -spreadType side \
-        -pin {audio_pwm_o audio_sd_o pwr_sleep_req_o pwr_ack_i}
+        -pin {pwm_audio_o {gpio_o[0]} {gpio_o[1]} {gpio_o[2]} {gpio_o[3]}}
 
     editPin -fixOverlap 1 -spreadDirection clockwise -side Left -layer 2 -spreadType side \
-        -pin {uart_rx_i ext_irq_i timer_irq_o}
+        -pin {uart_rx_i jtag_tck_i jtag_tms_i jtag_tdi_i jtag_tdo_o}
 
     editPin -fixOverlap 1 -spreadDirection clockwise -side Right -layer 2 -spreadType side \
-        -pin {spi_sck_o spi_cs_n_o spi_mosi_o spi_miso_i}
+        -pin {spi_sclk_o spi_cs_n_o spi_mosi_o spi_miso_i}
 
     saveDesign bharatvoice_top
 }
@@ -230,11 +230,19 @@ proc signoff {} {
     verify_drc -report [file join $rep_dir "innovus_drc.rpt"] -limit 1000
     verify_connectivity -type all -report [file join $rep_dir "innovus_lvs.rpt"]
 
-    streamOut [file join $out_dir "bharatvoice_top.gds"] \
-        -libName bharatvoice_top \
-        -merge /home/cadence/install/FOUNDRY/digital/90nm/dig/gds/gsclib090.gds \
-        -units 1000 \
-        -mode ALL
+    set gds_merge "/home/cadence/install/FOUNDRY/digital/90nm/dig/gds/gsclib090.gds"
+    if {[file exists $gds_merge]} {
+        streamOut [file join $out_dir "bharatvoice_top.gds"] \
+            -libName bharatvoice_top \
+            -merge $gds_merge \
+            -units 1000 \
+            -mode ALL
+    } else {
+        streamOut [file join $out_dir "bharatvoice_top.gds"] \
+            -libName bharatvoice_top \
+            -units 1000 \
+            -mode ALL
+    }
 
     puts "======================================================================="
     puts "  INNOVUS PHYSICAL DESIGN COMPLETED FOR bharatvoice_top"

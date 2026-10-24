@@ -22,13 +22,31 @@ cd "$PRJ_ROOT"
 STATE_FILE="$PRJ_ROOT/.cadence_state"
 ERR_LOG="$PRJ_ROOT/cadence_flow_error.log"
 
-# Initialize fresh state if --clean passed or no state file exists
-if [ ! -f "$STATE_FILE" ] || [ "$1" == "--clean" ]; then
+# Initialize flow state or accept manual stage override
+STAGE_ARG=$(echo "$1" | tr '[:lower:]' '[:upper:]')
+if [ "$1" == "--clean" ] || [ "$1" == "--all" ]; then
     echo "STAGE=XCELIUM" > "$STATE_FILE"
     echo "STATUS=NOT_STARTED" >> "$STATE_FILE"
     echo "ATTEMPTS=0" >> "$STATE_FILE"
     rm -f "$ERR_LOG"
     echo "[INFO] Initialized flow state at Stage 1 (XCELIUM)."
+elif [ "$STAGE_ARG" == "CONFORMAL" ] || [ "$STAGE_ARG" == "TEMPUS" ] || [ "$STAGE_ARG" == "INNOVUS" ] || [ "$STAGE_ARG" == "GENUS" ] || [ "$STAGE_ARG" == "XCELIUM" ]; then
+    echo "STAGE=$STAGE_ARG" > "$STATE_FILE"
+    echo "STATUS=NOT_STARTED" >> "$STATE_FILE"
+    echo "ATTEMPTS=0" >> "$STATE_FILE"
+    rm -f "$ERR_LOG"
+    echo "[INFO] Overriding flow state to Stage: $STAGE_ARG."
+elif [ ! -f "$STATE_FILE" ]; then
+    if [ -f "syn/netlists/bharatvoice_top_netlist.v" ]; then
+        echo "STAGE=CONFORMAL" > "$STATE_FILE"
+        echo "[INFO] Synthesized netlist detected. Resuming flow at Stage 3 (CONFORMAL)."
+    else
+        echo "STAGE=XCELIUM" > "$STATE_FILE"
+        echo "[INFO] Initialized flow state at Stage 1 (XCELIUM)."
+    fi
+    echo "STATUS=NOT_STARTED" >> "$STATE_FILE"
+    echo "ATTEMPTS=0" >> "$STATE_FILE"
+    rm -f "$ERR_LOG"
 fi
 
 get_state() {
