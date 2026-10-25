@@ -1,14 +1,14 @@
 # =============================================================================
 # Cadence Conformal LEC Script for BharatVoice SoC
-# Tool   : Conformal 21.1 (lec -nogui -dofile lec.tcl)
-# Run from project root: /home/userdata/24bvd0092/asic_proj/BharatVoice-SoC
+# Pattern: Matches VIT Lab LEC Class Template exactly
+# Usage  : lec -nogui -dofile lec.tcl
 # =============================================================================
 
-# 1. Read Standard Cell Verilog Behavioral Library
-read_library /home/cadence/install/FOUNDRY/digital/90nm/dig/verilog/gsclib090_allvt.v -both
+# 1. Read Foundry Technology Library with -lib flag (Liberty format)
+read_library -lib /home/cadence/install/FOUNDRY/digital/90nm/dig/lib/typical.lib -both
 
-# 2. Read Golden Design (RTL SystemVerilog)
-read_design -golden -sv \
+# 2. Read Golden Design (All 17 SystemVerilog RTL files)
+read_design -golden -systemverilog \
     ibex_core.sv \
     boot_rom.sv \
     uart_rx.sv \
@@ -29,20 +29,19 @@ read_design -golden -sv \
 
 set_root_module bharatvoice_top -golden
 
-# 3. Read Revised Design (Synthesized Gate-Level Netlist)
-read_design -revised -verilog syn/netlists/bharatvoice_top_netlist.v
+# 3. Read Revised Design (Synthesized Netlist from Genus)
+read_design -revised -verilog ./syn/netlists/bharatvoice_top_netlist.v
 
 set_root_module bharatvoice_top -revised
 
-# 4. Switch to LEC Mode
+# 4. Set System Mode to LEC
 set_system_mode lec
 
-# 5. Map and Compare All Key Points
+# 5. Add Compare Points & Compare
 add_compared_points -all
 
 compare
 
-# 6. Report Verification Results
-report_verification -verbose
-
+# 6. Report Verification
+report_verification
 report_compare_data -class nonequivalent -class abort -class notcompared
