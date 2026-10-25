@@ -17,17 +17,14 @@ add pin constraints 0 jtag_tck_i -both
 add pin constraints 0 jtag_tms_i -both
 add pin constraints 0 jtag_tdi_i -both
 
-add pin constraints 1 rst_ff2 -both
-add pin constraints 1 rst_sync_n -both
-
 set system mode lec
 
-delete compared points rst_ff1 -golden
-delete compared points rst_ff2 -golden
-
 map key points
+report unmapped points -summary
+report unmapped points -notmapped > unmapped.rpt
 add compared points -all
 compare
 
-report verification
-report compare data -class nonequivalent -class abort -class notcompared
+report verification > verify.rpt
+report compare data -class nonequivalent -class abort -class notcompared > noneq.rpt
+diagnose -noanalyze
