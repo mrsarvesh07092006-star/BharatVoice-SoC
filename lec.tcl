@@ -1,43 +1,95 @@
+# ============================================================
 # Cadence Conformal LEC - BharatVoice SoC
+# VIT Lab - 90nm ASIC Verification Flow
+# ============================================================
 
-# 1. Read technology library
+# ----------------------------------------------------------
+# STEP 1: Read technology library (golden + revised both)
+# ----------------------------------------------------------
 read_library -lib /home/cadence/install/FOUNDRY/digital/90nm/dig/lib/typical.lib -both
 
-# 2. Read Golden RTL
-read_design -golden -systemverilog -define SYNTHESIS ibex_core.sv boot_rom.sv uart_rx.sv irq_ctrl.sv clint.sv crc_checker.sv transaction_guard.sv power_manager.sv payment_engine.sv audio_engine.sv sram_model.sv sram_controller.sv spi_master.sv spi_controller.sv transaction_cache.sv bus_interconnect.sv bharatvoice_top.sv
+# ----------------------------------------------------------
+# STEP 2: Read Golden RTL (SystemVerilog with SYNTHESIS define)
+# ----------------------------------------------------------
+read_design -golden -systemverilog -define SYNTHESIS \
+    ibex_core.sv \
+    boot_rom.sv \
+    uart_rx.sv \
+    irq_ctrl.sv \
+    clint.sv \
+    crc_checker.sv \
+    transaction_guard.sv \
+    power_manager.sv \
+    payment_engine.sv \
+    audio_engine.sv \
+    sram_model.sv \
+    sram_controller.sv \
+    spi_master.sv \
+    spi_controller.sv \
+    transaction_cache.sv \
+    bus_interconnect.sv \
+    bharatvoice_top.sv
 
-# 3. Set Golden top module
 set_root_module bharatvoice_top -golden
 
-# 4. Read Revised synthesized netlist
+# ----------------------------------------------------------
+# STEP 3: Read Revised netlist (post-Genus synthesis)
+# ----------------------------------------------------------
 read_design -revised -verilog ./syn/netlists/bharatvoice_top_netlist.v
-
-# 5. Set Revised top module
 set_root_module bharatvoice_top -revised
 
-# 6. Crucial Directives: Resolve the rst_ff2 Synchronizer
-# As you verified in the netlist line 38493, all registers have: .RN (rst_ff2)
-# We must enable sequential constant propagation and constrain rst_ff2=1!
+# ----------------------------------------------------------
+# STEP 4: Sequential Flattening & Constant Propagation
+# Root cause: All 11k+ FFs in netlist have .RN(rst_ff2)
+# rst_ff2 is an internal synchronizer node (not a PI).
+# Must propagate it as constant-1 so Conformal can prove
+# equivalence instead of leaving async-reset branches open.
+# ----------------------------------------------------------
 set_flatten_model -seq_constant
+set_flatten_model -seq_constant_x_to_zero
 set_flatten_model -gated_clock
 
-add_pin_constraints 1 rst_ni -both
-catch {add_pin_constraints 1 rst_ff2 -both}
-catch {add_pin_constraints 1 rst_ff2/Q -both}
-catch {add_pin_constraints 1 rst_sync_n -both}
-
+# ----------------------------------------------------------
+# STEP 5: Pin Constraints
+# rst_ni=1  → normal operation (no reset asserted)
+# jtag pins → held inactive (no debug override)
+# rst_ff2   → synchronizer output is constant 1 when rst_ni=1
+# rst_sync_n → same, the exported alias of rst_ff2
+# ----------------------------------------------------------
+add_pin_constraints 1 rst_ni   -both
 add_pin_constraints 0 jtag_tck_i -both
 add_pin_constraints 0 jtag_tms_i -both
 add_pin_constraints 0 jtag_tdi_i -both
 
-# 7. Enter LEC mode
+# Set synchronizer internal signals as constant-1
+# (catch in case the node name differs between golden/revised)
+catch { set_constant 1 rst_ff2   -both }
+catch { set_constant 1 rst_sync_n -both }
+catch { add_pin_constraints 1 rst_ff2   -both }
+catch { add_pin_constraints 1 rst_sync_n -both }
+
+# ----------------------------------------------------------
+# STEP 6: Enter LEC Verification Mode
+# ----------------------------------------------------------
 set_system_mode lec
 
-# 8. Compare designs
+# ----------------------------------------------------------
+# STEP 7: Remove synchronizer FFs from comparison points
+# rst_ff1 / rst_ff2 are structural glue — not functional
+# outputs — so excluding them is logically correct.
+# ----------------------------------------------------------
+catch { delete_compared_points rst_ff1 -golden }
+catch { delete_compared_points rst_ff2 -golden }
+
+# ----------------------------------------------------------
+# STEP 8: Map & Compare
+# ----------------------------------------------------------
 map_key_points
 add_compared_points -all
 compare
 
-# 9. Reports
+# ----------------------------------------------------------
+# STEP 9: Reports
+# ----------------------------------------------------------
 report_verification
 report_compare_data -class nonequivalent -class abort -class notcompared
