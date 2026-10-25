@@ -15,7 +15,6 @@ set_root_module bharatvoice_top -revised
 
 # 4. Sequential Flattening and Constant Propagation
 set_flatten_model -seq_constant
-set_flatten_model -seq_constant_x_to_zero
 set_flatten_model -gated_clock
 
 # 5. Pin Constraints

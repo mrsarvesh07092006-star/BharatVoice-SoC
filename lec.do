@@ -10,7 +10,6 @@ read design -revised -verilog ./syn/netlists/bharatvoice_top_netlist.v
 set root module bharatvoice_top -revised
 
 set flatten model -seq_constant
-set flatten model -seq_constant_x_to_zero
 set flatten model -gated_clock
 
 add pin constraints 1 rst_ni -both
