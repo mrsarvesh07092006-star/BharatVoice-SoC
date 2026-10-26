@@ -150,12 +150,14 @@ proc routing {} {
     setNanoRouteMode -quiet -routeTdrEffort 1
     setNanoRouteMode -quiet -routeTopRoutingLayer 7
     setNanoRouteMode -quiet -routeBottomRoutingLayer 1
-    setNanoRouteMode -quiet -drouteEndIteration 1
+    setNanoRouteMode -quiet -drouteEndIteration default
+    setNanoRouteMode -quiet -drouteFixDRC true
     setNanoRouteMode -quiet -routeWithTimingDriven true
     setNanoRouteMode -quiet -routeWithSiDriven false
     routeDesign -globalDetail
     setAnalysisMode -analysisType onChipVariation -cppr both
     routeDesign -trackopt
+    ecoRoute -fix_drc
     saveDesign 06_route
 }
 
