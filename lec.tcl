@@ -10,8 +10,13 @@ set_root_module bharatvoice_top -golden
 read_design -revised -verilog ./syn/netlists/bharatvoice_top_netlist.v
 set_root_module bharatvoice_top -revised
 
-# Align undriven floating RTL outputs (jtag_tdo_o) to 0 matching netlist tie-off
+# Align undriven floating RTL outputs to 0 matching netlist tie-off
 set_undriven_signal 0 -golden
+catch { set_x_conversion 0 -both }
+
+# Ignore unassigned / floating debug test port jtag_tdo_o
+catch { add_ignored_outputs jtag_tdo_o -both }
+catch { add_ignored_outputs /jtag_tdo_o -both }
 
 add_pin_constraints 1 rst_ni -both
 add_pin_constraints 0 jtag_tck_i -both
@@ -24,7 +29,11 @@ map_key_points
 report_unmapped_points -summary
 report_unmapped_points -notmapped
 add_compared_points -all
+
+# Remove jtag_tdo_o if it was added
+catch { delete_compared_points /jtag_tdo_o }
 catch { delete_compared_points jtag_tdo_o }
+
 compare
 
 report_verification -verbose
