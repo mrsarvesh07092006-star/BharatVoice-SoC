@@ -1,142 +1,91 @@
 # =============================================================================
 # Cadence Innovus Physical Design (PnR) Script for BharatVoice SoC
-# Adapted for VIT Lab Server 90nm Foundry Setup
-# Top Module: bharatvoice_top
+# Adapted for VIT Lab 90nm Flow (Top Module: bharatvoice_top)
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# 0. Automatically Determine Project Root Directory
-# -----------------------------------------------------------------------------
-set script_path [file normalize [info script]]
-set script_dir  [file dirname $script_path]
-
-if {[file exists [file join $script_dir "../../bharatvoice_top.sv"]]} {
-    set prj_root [file normalize [file join $script_dir "../.."]]
-} elseif {[file exists [file join $script_dir "../bharatvoice_top.sv"]]} {
-    set prj_root [file normalize [file join $script_dir ".."]]
-} elseif {[file exists "./bharatvoice_top.sv"]} {
-    set prj_root [file normalize "."]
-} else {
-    set prj_root [pwd]
-}
-
-puts "\[INFO\] Project root directory identified as: $prj_root"
-
-# -----------------------------------------------------------------------------
-# 1. Design Initialization & MMMC Setup
-# -----------------------------------------------------------------------------
+# 1. Initialization & MMMC Setup
 proc init_design_flow {} {
     global init_lef_file
     global init_verilog
     global init_top_cell
-    global prj_root
 
-    # Read physical libraries (90nm Foundry LEF files)
+    # Read physical libraries (90nm LEF files)
     set init_lef_file {
         /home/cadence/install/FOUNDRY/digital/90nm/dig/lef/gsclib090_translated.lef
         /home/cadence/install/FOUNDRY/digital/90nm/dig/lef/gsclib090_tech.lef
     }
 
-    # Locate synthesized gate-level netlist
-    set netlist_candidates [list \
-        [file join $prj_root "syn/netlists/bharatvoice_top_netlist.v"] \
-        [file join $prj_root "netlists/bharatvoice_top_netlist.v"] \
-        "./syn/netlists/bharatvoice_top_netlist.v" \
-    ]
-
-    set init_verilog [lindex $netlist_candidates 0]
-    foreach n $netlist_candidates {
-        if {[file exists $n]} { set init_verilog $n; break }
-    }
-
+    set init_verilog ./syn/netlists/bharatvoice_top_netlist.v
     set init_top_cell bharatvoice_top
 
     set ::init_pwr_net {VDD}
     set ::init_gnd_net {VSS}
 
-    # Locate timing libraries (.lib)
-    set slow_candidates [list \
-        "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/slow.lib" \
-        [file join $prj_root "syn/slow.lib"] \
-        [file join $prj_root "slow.lib"] \
-    ]
-    set typ_candidates [list \
-        "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/typical.lib" \
-        [file join $prj_root "syn/typical.lib"] \
-        [file join $prj_root "typical.lib"] \
-    ]
-    set fast_candidates [list \
-        "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/fast.lib" \
-        [file join $prj_root "syn/fast.lib"] \
-        [file join $prj_root "fast.lib"] \
-    ]
+    # Timing libraries (Slow, Typical, Fast)
+    create_library_set -name slow_lib \
+        -timing [list /home/cadence/install/FOUNDRY/digital/90nm/dig/lib/slow.lib]
 
-    set slow_file [lindex $slow_candidates 0]
-    foreach f $slow_candidates { if {[file exists $f]} { set slow_file $f; break } }
+    create_library_set -name typical_lib \
+        -timing [list /home/cadence/install/FOUNDRY/digital/90nm/dig/lib/typical.lib]
 
-    set typ_file [lindex $typ_candidates 0]
-    foreach f $typ_candidates { if {[file exists $f]} { set typ_file $f; break } }
+    create_library_set -name fast_lib \
+        -timing [list /home/cadence/install/FOUNDRY/digital/90nm/dig/lib/fast.lib]
 
-    set fast_file [lindex $fast_candidates 0]
-    foreach f $fast_candidates { if {[file exists $f]} { set fast_file $f; break } }
+    # Constraint mode (SDC)
+    set sdc_file ./syn/constraints/bharatvoice.sdc
+    if {![file exists $sdc_file]} {
+        set sdc_file ./bharatvoice_top.sdc
+    }
+    create_constraint_mode -name func_mode \
+        -sdc_files [list $sdc_file]
 
-    # Locate SDC constraints
-    set sdc_candidates [list \
-        [file join $prj_root "bharatvoice_top.sdc"] \
-        [file join $prj_root "syn/constraints/bharatvoice.sdc"] \
-        "./bharatvoice_top.sdc" \
-    ]
-    set sdc_file [lindex $sdc_candidates 0]
-    foreach s $sdc_candidates { if {[file exists $s]} { set sdc_file $s; break } }
-
-    puts "\[INFO\] Using Netlist : $init_verilog"
-    puts "\[INFO\] Using SDC     : $sdc_file"
-    puts "\[INFO\] Using Slow Lib: $slow_file"
-
-    create_library_set -name slow_lib    -timing [list $slow_file]
-    create_library_set -name typical_lib -timing [list $typ_file]
-    create_library_set -name fast_lib    -timing [list $fast_file]
-
-    create_constraint_mode -name func_mode -sdc_files [list $sdc_file]
-
+    # Delay corners
     create_delay_corner -name slow_corner    -library_set slow_lib
     create_delay_corner -name typical_corner -library_set typical_lib
     create_delay_corner -name fast_corner    -library_set fast_lib
 
+    # Analysis views
     create_analysis_view -name slow_view    -constraint_mode func_mode -delay_corner slow_corner
     create_analysis_view -name typical_view -constraint_mode func_mode -delay_corner typical_corner
     create_analysis_view -name fast_view    -constraint_mode func_mode -delay_corner fast_corner
 
+    # Initialize design
     init_design -setup slow_view -hold fast_view
+
+    # Set active views
     set_analysis_view -setup {slow_view} -hold {fast_view}
+
+    # Basic checks
     checkDesign -all
+
+    # Save checkpoint
     saveDesign 01_init
 }
 
-# -----------------------------------------------------------------------------
 # 2. Floorplanning & Pin Placement
-# -----------------------------------------------------------------------------
 proc floorplan {} {
     floorPlan -site gsclib090site -r 1.0 0.70 10.15 10.15 10.15 10.15
 
+    # Clock & Reset -> TOP
     editPin -pinWidth 0.12 -pinDepth 0.585 -fixOverlap 1 -spreadDirection clockwise -side Top -layer 1 -spreadType side \
         -pin {clk_i rst_ni}
 
+    # PWM Audio & GPIOs -> BOTTOM
     editPin -fixOverlap 1 -spreadDirection clockwise -side Bottom -layer 1 -spreadType side \
         -pin {pwm_audio_o {gpio_o[0]} {gpio_o[1]} {gpio_o[2]} {gpio_o[3]}}
 
+    # UART & JTAG -> LEFT
     editPin -fixOverlap 1 -spreadDirection clockwise -side Left -layer 2 -spreadType side \
         -pin {uart_rx_i jtag_tck_i jtag_tms_i jtag_tdi_i jtag_tdo_o}
 
+    # SPI Interface -> RIGHT
     editPin -fixOverlap 1 -spreadDirection clockwise -side Right -layer 2 -spreadType side \
         -pin {spi_sclk_o spi_cs_n_o spi_mosi_o spi_miso_i}
 
-    saveDesign bharatvoice_top
+    saveDesign 02_floorplan
 }
 
-# -----------------------------------------------------------------------------
 # 3. Power Distribution Network (PDN)
-# -----------------------------------------------------------------------------
 proc power_plan {} {
     globalNetConnect VDD -type pgpin -pin VDD -all
     globalNetConnect VSS -type pgpin -pin VSS -all
@@ -158,8 +107,6 @@ proc power_plan {} {
         -max_same_layer_jog_length 2 -padcore_ring_top_layer_limit Metal9 -padcore_ring_bottom_layer_limit Metal1 \
         -block_ring_top_layer_limit Metal9 -block_ring_bottom_layer_limit Metal1 -use_wire_group 0 -snap_wire_center_to_grid None
 
-    saveDesign bharatvoice_top
-
     setSrouteMode -viaConnectToShape { noshape }
     sroute -connect { blockPin padPin padRing corePin floatingStripe } \
         -layerChangeRange { Metal1(1) Metal5(5) } \
@@ -174,19 +121,17 @@ proc power_plan {} {
         -allowLayerChange 1 \
         -blockPin useLef \
         -targetViaLayerRange { Metal1(1) Metal9(9) }
+
+    saveDesign 03_power
 }
 
-# -----------------------------------------------------------------------------
 # 4. Standard Cell Placement
-# -----------------------------------------------------------------------------
 proc placement {} {
     place_design
-    saveDesign bharatvoice_top
+    saveDesign 04_placement
 }
 
-# -----------------------------------------------------------------------------
 # 5. Clock Tree Synthesis (CCOpt)
-# -----------------------------------------------------------------------------
 proc cts {} {
     set_ccopt_property target_max_trans 0.5
     set_ccopt_property buffer_cells {CLKBUFX2 CLKBUFX20 CLKBUFX3 CLKBUFX4 CLKBUFX6 CLKBUFX8 CLKBUFX12 CLKBUFX16}
@@ -199,9 +144,7 @@ proc cts {} {
     saveDesign 05_cts
 }
 
-# -----------------------------------------------------------------------------
 # 6. Detail Routing (NanoRoute)
-# -----------------------------------------------------------------------------
 proc routing {} {
     setNanoRouteMode -quiet -routeWithTimingDriven 1
     setNanoRouteMode -quiet -routeTdrEffort 1
@@ -216,29 +159,23 @@ proc routing {} {
     saveDesign 06_route
 }
 
-# -----------------------------------------------------------------------------
 # 7. Physical Verification & Signoff (DRC, LVS, GDSII)
-# -----------------------------------------------------------------------------
 proc signoff {} {
-    global prj_root
+    file mkdir ./output
+    file mkdir ./pnr/reports
 
-    set out_dir [file join $prj_root "output"]
-    set rep_dir [file join $prj_root "pnr/reports"]
-    file mkdir $out_dir
-    file mkdir $rep_dir
-
-    verify_drc -report [file join $rep_dir "innovus_drc.rpt"] -limit 1000
-    verify_connectivity -type all -report [file join $rep_dir "innovus_lvs.rpt"]
+    verify_drc -report ./pnr/reports/innovus_drc.rpt -limit 1000
+    verify_connectivity -type all -report ./pnr/reports/innovus_lvs.rpt
 
     set gds_merge "/home/cadence/install/FOUNDRY/digital/90nm/dig/gds/gsclib090.gds"
     if {[file exists $gds_merge]} {
-        streamOut [file join $out_dir "bharatvoice_top.gds"] \
+        streamOut ./output/bharatvoice_top.gds \
             -libName bharatvoice_top \
             -merge $gds_merge \
             -units 1000 \
             -mode ALL
     } else {
-        streamOut [file join $out_dir "bharatvoice_top.gds"] \
+        streamOut ./output/bharatvoice_top.gds \
             -libName bharatvoice_top \
             -units 1000 \
             -mode ALL
@@ -246,8 +183,8 @@ proc signoff {} {
 
     puts "======================================================================="
     puts "  INNOVUS PHYSICAL DESIGN COMPLETED FOR bharatvoice_top"
-    puts "  GDSII   : [file join $out_dir "bharatvoice_top.gds"]"
-    puts "  Reports : $rep_dir"
+    puts "  GDSII   : ./output/bharatvoice_top.gds"
+    puts "  Reports : ./pnr/reports"
     puts "======================================================================="
 }
 
@@ -261,3 +198,7 @@ placement
 cts
 routing
 signoff
+
+# Automatically show GUI and fit layout on screen
+catch { gui_show }
+catch { fit }
