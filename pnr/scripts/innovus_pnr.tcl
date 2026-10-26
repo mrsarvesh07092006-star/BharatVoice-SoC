@@ -189,6 +189,17 @@ proc signoff {} {
 }
 
 # -----------------------------------------------------------------------------
+# Quick Helper: View Layout in GUI
+# -----------------------------------------------------------------------------
+proc view_layout {} {
+    if {[file exists 06_route.dat]} {
+        restoreDesign 06_route.dat bharatvoice_top
+    }
+    catch { gui_show }
+    fit
+}
+
+# -----------------------------------------------------------------------------
 # Main Execution Pipeline
 # -----------------------------------------------------------------------------
 init_design_flow
@@ -201,4 +212,4 @@ signoff
 
 # Automatically show GUI and fit layout on screen
 catch { gui_show }
-catch { fit }
+fit
