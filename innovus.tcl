@@ -99,28 +99,28 @@ proc power_plan {} {
 
     addStripe -nets {VDD VSS} -layer Metal3 -direction horizontal -width 1.8 -spacing 1.8 \
         -set_to_set_distance 20 -start_from bottom -start_offset 10 -switch_layer_over_obs false \
-        -max_same_layer_jog_length 2 -padcore_ring_top_layer_limit Metal9 -padcore_ring_bottom_layer_limit Metal1 \
-        -block_ring_top_layer_limit Metal9 -block_ring_bottom_layer_limit Metal1 -use_wire_group 0 -snap_wire_center_to_grid None
+        -max_same_layer_jog_length 2 -padcore_ring_top_layer_limit Metal7 -block_ring_top_layer_limit Metal7 \
+        -block_ring_bottom_layer_limit Metal1 -use_wire_group 0 -snap_wire_center_to_grid None
 
     addStripe -nets {VDD VSS} -layer Metal4 -direction vertical -width 1.8 -spacing 1.8 \
         -set_to_set_distance 20 -start_from left -start_offset 10 -switch_layer_over_obs false \
-        -max_same_layer_jog_length 2 -padcore_ring_top_layer_limit Metal9 -padcore_ring_bottom_layer_limit Metal1 \
-        -block_ring_top_layer_limit Metal9 -block_ring_bottom_layer_limit Metal1 -use_wire_group 0 -snap_wire_center_to_grid None
+        -max_same_layer_jog_length 2 -padcore_ring_top_layer_limit Metal7 -block_ring_top_layer_limit Metal7 \
+        -block_ring_bottom_layer_limit Metal1 -use_wire_group 0 -snap_wire_center_to_grid None
 
     setSrouteMode -viaConnectToShape { noshape }
     sroute -connect { blockPin padPin padRing corePin floatingStripe } \
-        -layerChangeRange { Metal1(1) Metal5(5) } \
+        -layerChangeRange { Metal1(1) Metal7(7) } \
         -blockPinTarget { nearestTarget } \
         -padPinPortConnect { allPort oneGeom } \
         -padPinTarget { nearestTarget } \
         -corePinTarget { firstAfterRowEnd } \
         -floatingStripeTarget { blockring padring ring stripe ringpin blockpin followpin } \
         -allowJogging 1 \
-        -crossoverViaLayerRange { Metal1(1) Metal9(9) } \
+        -crossoverViaLayerRange { Metal1(1) Metal7(7) } \
         -nets { VDD VSS } \
         -allowLayerChange 1 \
         -blockPin useLef \
-        -targetViaLayerRange { Metal1(1) Metal9(9) }
+        -targetViaLayerRange { Metal1(1) Metal7(7) }
 
     saveDesign 03_power
 }
