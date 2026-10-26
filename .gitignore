@@ -27,4 +27,10 @@ quartus/simulation/
 # Zip Archives
 *.zip
 
+# Cadence Intermediate & Flow Artifacts
+fv/
+*.flag
+.cadence_state
+lec/conformal_lec_runtime.do
+
 

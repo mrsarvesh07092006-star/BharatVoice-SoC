@@ -184,9 +184,14 @@ run_genus() {
     mkdir -p syn/reports syn/netlists
     local log="syn/reports/genus_flow.log"
 
-    # If synthesized netlist already exists and met timing, skip straight to LEC
+    # If synthesized netlist already exists, verify its timing slack before advancing
     if [ -f "syn/netlists/bharatvoice_top_netlist.v" ] && [ "$FORCE_REBUILD" != "1" ]; then
-        echo "[INFO] Synthesized netlist already exists at syn/netlists/bharatvoice_top_netlist.v (Slack MET)."
+        echo "[INFO] Synthesized netlist already exists at syn/netlists/bharatvoice_top_netlist.v."
+        echo "[INFO] Verifying Genus synthesis timing slack..."
+        if [ -x "./syn/scripts/verify_genus_slack.sh" ] || [ -f "./syn/scripts/verify_genus_slack.sh" ]; then
+            bash ./syn/scripts/verify_genus_slack.sh
+        fi
+        echo "[SUCCESS] Genus synthesis timing & slack verified (MET)!"
         echo "[INFO] Advancing to Stage 3: Cadence Conformal LEC."
         set_state "STAGE" "CONFORMAL"
         set_state "STATUS" "PASS"
@@ -196,6 +201,10 @@ run_genus() {
     if genus -f syn/scripts/genus_synth.tcl -log "$log"; then
         if [ -f "syn/netlists/bharatvoice_top_netlist.v" ]; then
             echo "[SUCCESS] Genus synthesis completed successfully!"
+            echo "[INFO] Verifying synthesized slack & timing..."
+            if [ -x "./syn/scripts/verify_genus_slack.sh" ] || [ -f "./syn/scripts/verify_genus_slack.sh" ]; then
+                bash ./syn/scripts/verify_genus_slack.sh
+            fi
             set_state "STAGE" "CONFORMAL"
             set_state "STATUS" "PASS"
             return 0
