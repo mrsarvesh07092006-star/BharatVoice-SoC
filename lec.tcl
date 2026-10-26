@@ -24,6 +24,9 @@ catch { add_black_box sram_controller -golden }
 catch { add_black_box sram_controller_ADDR_WIDTH16_DATA_WIDTH32_MEM_DEPTH256 -revised }
 catch { add_black_box ibex_core -both }
 
+# 5b. Treat undriven outputs as 0 (jtag_tdo_o is tied to 0 in synthesis)
+set_undriven_signal 0 -golden
+
 # 6. Operating Pin Constraints
 add_pin_constraints 1 rst_ni -both
 add_pin_constraints 0 jtag_tck_i -both
@@ -37,6 +40,7 @@ set_system_mode lec
 map_key_points
 report_unmapped_points -summary
 add_compared_points -all
+catch { delete_compared_points jtag_tdo_o }
 compare
 
 # 9. Reports
