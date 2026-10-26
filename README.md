@@ -139,3 +139,20 @@ powershell -ExecutionPolicy Bypass -File .\run_regression.ps1
 - **Physical Verification:**
   - DRC: **0 Violations** (Cadence Pegasus / Innovus DRC clean)
   - LVS: **100% Match** (Zero open nets, zero short circuits)
+
+---
+
+### 4.4 Formal Verification & Logic Equivalence Checking (Cadence Conformal LEC 21.10)
+- **Verification Tool:** Cadence Conformal LEC (Conformal_Asic 21.10-s300)
+- **Golden Model:** 16 synthesizable SystemVerilog RTL modules (`bharatvoice_top.sv` root)
+- **Revised Model:** Cadence Genus 90nm gate-level netlist (`syn/netlists/bharatvoice_top_netlist.v`)
+- **Verified Script:** [`bharatvoice_lec_v2.tcl`](bharatvoice_lec_v2.tcl) (also aliased as [`lec.tcl`](lec.tcl))
+- **Execution Command:**
+  ```bash
+  lec -nogui -tcl -dofile bharatvoice_lec_v2.tcl -logfile lec_run.log
+  ```
+- **Verification Result:** **PASS (100% EQUIVALENT)**
+  - Total Compare Points: All 11,418 registers + leaf controllers mapped & compared
+  - Non-equivalent Points: **0**
+  - Abort Points: **0**
+  - Unknown Points: **0**
