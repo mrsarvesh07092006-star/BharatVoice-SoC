@@ -24,6 +24,10 @@ set_clock_transition 0.150 [get_clocks clk_sys]
 # Asynchronous external power-on reset (synchronized on-chip by 2-stage synchronizer)
 set_false_path -from [get_ports rst_ni]
 
+# Asynchronous on-chip reset synchronizer output (drives 11k+ async reset .RN pins)
+catch { set_false_path -from [get_pins -hier *rst_ff2*/Q] }
+catch { set_false_path -from [get_pins rst_ff2_reg/Q] }
+
 # JTAG static/debug inputs (asynchronous to system clock)
 set_false_path -from [get_ports {jtag_tck_i jtag_tms_i jtag_tdi_i}]
 set_false_path -to   [get_ports jtag_tdo_o]
