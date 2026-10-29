@@ -6,6 +6,10 @@
 
 set -e
 
+# Export Cadence License Servers
+export CDS_LIC_FILE="5280@14.139.1.126:1717@14.139.1.126"
+export LM_LICENSE_FILE="5280@14.139.1.126:1717@14.139.1.126"
+
 PRJ_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PRJ_ROOT"
 
@@ -107,7 +111,12 @@ echo "[INFO] Using lec binary: $LEC_BIN"
 # -----------------------------------------------------------------------------
 # 6. Run Conformal LEC in batch mode
 # -----------------------------------------------------------------------------
-"$LEC_BIN" -nogui -dofile "$DOFILE" -logfile "$PRJ_ROOT/lec/conformal.log"
+if [ -f "$PRJ_ROOT/bharatvoice_lec_v2.tcl" ]; then
+    echo "[INFO] Using verified golden script: bharatvoice_lec_v2.tcl"
+    "$LEC_BIN" -nogui -tcl -dofile "$PRJ_ROOT/bharatvoice_lec_v2.tcl" -logfile "$PRJ_ROOT/lec/conformal.log"
+else
+    "$LEC_BIN" -nogui -dofile "$DOFILE" -logfile "$PRJ_ROOT/lec/conformal.log"
+fi
 
 echo "======================================================================="
 echo " [CADENCE CONFORMAL] LEC Verification Complete!"
