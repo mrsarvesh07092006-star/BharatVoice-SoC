@@ -6,6 +6,13 @@
 
 set -e
 
+# Export Cadence License Servers
+export CDS_LIC_FILE="5280@14.139.1.126:1717@14.139.1.126"
+export LM_LICENSE_FILE="5280@14.139.1.126:1717@14.139.1.126"
+
+# Ensure Xcelium binary is in PATH
+export PATH=/home/cadence/install/XCELIUM2209/bin:/home/cadence/install/XCELIUM2309/bin:$PATH
+
 PRJ_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PRJ_ROOT"
 
