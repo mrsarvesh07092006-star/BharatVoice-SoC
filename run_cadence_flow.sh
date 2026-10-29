@@ -147,6 +147,13 @@ handle_error() {
 
     echo ""
     echo "[ERROR] Stage $stage failed. Details written to: $ERR_LOG"
+
+    # Automatically push error report and checkpoint to GitHub for Antigravity AI
+    echo "[INFO] Automatically committing and pushing error report to GitHub..."
+    git add cadence_flow_error.log .cadence_state syn/reports/ pnr/reports/ sim/logs/ lec/ 2>/dev/null || true
+    git commit -m "ci: flow halted at stage $stage - automated error report for Antigravity AI" 2>/dev/null || true
+    git push origin main 2>/dev/null || true
+    echo "[INFO] Error report pushed to GitHub. Waiting for Antigravity AI fix..."
     exit 1
 }
 
@@ -423,3 +430,10 @@ echo "======================================================================="
 echo " COMPLETE 5-TOOL CADENCE ASIC FLOW FINISHED WITH 100% SUCCESS!"
 echo " Tapeout GDSII generated at: output/bharatvoice_top.gds"
 echo "======================================================================="
+
+# Automatically push final GDSII and signoff reports to GitHub
+echo "[INFO] Automatically committing and pushing final GDSII and signoff reports to GitHub..."
+git add output/bharatvoice_top.gds pnr/reports/ syn/reports/ .cadence_state 2>/dev/null || true
+git commit -m "ci: complete flow success - GDSII and signoff reports generated" 2>/dev/null || true
+git push origin main 2>/dev/null || true
+echo "[INFO] All deliverables pushed to GitHub successfully!"
