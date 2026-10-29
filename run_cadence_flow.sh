@@ -328,7 +328,13 @@ run_innovus() {
     fi
 
     echo "[INFO] Using innovus binary: $INNOVUS_BIN"
-    if "$INNOVUS_BIN" -files pnr/scripts/innovus_pnr.tcl -log "$log"; then
+    # Use master innovus.tcl (contains full flow: FP→PDN→Place→CTS→Route→ECO→DRC=0→GDS2)
+    local INNOVUS_SCRIPT="innovus.tcl"
+    if [ ! -f "$INNOVUS_SCRIPT" ] && [ -f "pnr/scripts/innovus_pnr.tcl" ]; then
+        INNOVUS_SCRIPT="pnr/scripts/innovus_pnr.tcl"
+    fi
+    echo "[INFO] Using Innovus script: $INNOVUS_SCRIPT"
+    if "$INNOVUS_BIN" -files "$INNOVUS_SCRIPT" -log "$log"; then
         if [ -f "output/bharatvoice_top.gds" ]; then
             echo "[SUCCESS] Innovus PnR and GDSII generation completed successfully!"
             set_state "STAGE" "COMPLETED"

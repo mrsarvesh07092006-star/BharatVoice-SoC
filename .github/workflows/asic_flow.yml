@@ -1,0 +1,169 @@
+name: BharatVoice ASIC Full Automated Flow
+
+# =============================================================================
+# Triggers:
+#   - Any push that changes RTL (.sv), scripts (.tcl), or constraints (.sdc)
+#   - Also triggers when AI pushes a fixed script after an error
+# =============================================================================
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.sv'
+      - '**.tcl'
+      - '**.sdc'
+      - 'run_cadence_flow.sh'
+      - 'cadence_flow_error.log'   # Re-triggers when AI pushes error fix
+
+jobs:
+  asic-flow:
+    name: "Full ASIC Flow: Xcelium → Genus → LEC → Innovus → GDS2"
+    runs-on: ubuntu-latest
+    timeout-minutes: 480           # 8 hours max (full PnR takes ~2hrs)
+
+    steps:
+      # ------------------------------------------------------------------
+      # 1. Checkout Latest Code
+      # ------------------------------------------------------------------
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ------------------------------------------------------------------
+      # 2. Configure SSH to Cadence Server
+      # ------------------------------------------------------------------
+      - name: Setup SSH to Cadence Server
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.CADENCE_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Add server fingerprint to known_hosts to avoid interactive prompt
+          ssh-keyscan -H cadence-server.vit.ac.in >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo "Host cadence-server.vit.ac.in
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null" >> ~/.ssh/config
+
+      # ------------------------------------------------------------------
+      # 3. Sync Code to Server + Run Full Flow
+      # ------------------------------------------------------------------
+      - name: Sync Code to Server and Run Full Automated ASIC Flow
+        id: run_flow
+        run: |
+          ssh 24bvd0092@cadence-server.vit.ac.in << 'ENDSSH'
+            set -e
+            cd /home/userdata/24bvd0092/asic_proj/BharatVoice-SoC
+
+            # Pull latest code (fixes and RTL changes)
+            git pull origin main || (git stash && git pull origin main)
+
+            # Set Cadence tool environment
+            export CDS_LIC_FILE=5280@14.139.1.126:1717@14.139.1.126
+            export LM_LICENSE_FILE=5280@14.139.1.126:1717@14.139.1.126
+            export PATH=/home/cadence/install/GENUS211/bin:$PATH
+            export PATH=/home/cadence/install/INNOVUS211/bin:$PATH
+            export PATH=/home/cadence/install/XCELIUM2309/bin:$PATH
+            export PATH=/home/cadence/install/CONFRML211/bin:$PATH
+            export PATH=/home/cadence/install/FOUNDRY/digital/90nm/dig/bin:$PATH
+
+            # Make scripts executable
+            chmod +x run_cadence_flow.sh
+
+            # ============================================================
+            # Run the full ASIC flow (auto-resumes from checkpoint)
+            # run_cadence_flow.sh reads .cadence_state to know which
+            # stage to resume from (does NOT restart if already passed)
+            # ============================================================
+            bash run_cadence_flow.sh
+
+          ENDSSH
+
+      # ------------------------------------------------------------------
+      # 4. Pull All Reports + GDS2 Back (always, even on failure)
+      # ------------------------------------------------------------------
+      - name: Download Reports and Error Logs from Server
+        if: always()
+        run: |
+          SERVER="24bvd0092@cadence-server.vit.ac.in"
+          RDIR="/home/userdata/24bvd0092/asic_proj/BharatVoice-SoC"
+
+          # Ensure local directories exist
+          mkdir -p pnr/reports/postroute output
+
+          # Pull signoff reports
+          scp -r ${SERVER}:${RDIR}/pnr/reports/ ./pnr/ || true
+
+          # Pull GDS2 layout
+          scp ${SERVER}:${RDIR}/output/bharatvoice_top.gds ./output/ || true
+
+          # Pull error log and checkpoint state
+          scp ${SERVER}:${RDIR}/cadence_flow_error.log ./ || true
+          scp ${SERVER}:${RDIR}/.cadence_state ./ || true
+
+          # Pull innovus log for timing info
+          scp ${SERVER}:${RDIR}/innovus.log ./ || true
+          scp ${SERVER}:${RDIR}/syn/reports/genus_flow.log ./syn/reports/ || true
+
+      # ------------------------------------------------------------------
+      # 5. Summarize Results as GitHub Actions Step Summary
+      # ------------------------------------------------------------------
+      - name: Generate Flow Summary
+        if: always()
+        run: |
+          echo "## 🏗️ BharatVoice ASIC Flow Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f ".cadence_state" ]; then
+            STAGE=$(grep "^STAGE=" .cadence_state | cut -d= -f2)
+            STATUS=$(grep "^STATUS=" .cadence_state | cut -d= -f2)
+            echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|:------|:------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Last Stage | \`${STAGE}\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| Status | \`${STATUS}\` |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f "output/bharatvoice_top.gds" ]; then
+            GDS_SIZE=$(du -h output/bharatvoice_top.gds | cut -f1)
+            echo "### ✅ GDS2 Generated Successfully" >> $GITHUB_STEP_SUMMARY
+            echo "**File:** \`output/bharatvoice_top.gds\` (**${GDS_SIZE}**)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -f "cadence_flow_error.log" ] && [ -s "cadence_flow_error.log" ]; then
+            echo "### ❌ Error Report" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            head -n 40 cadence_flow_error.log >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # ------------------------------------------------------------------
+      # 6. Push All Reports + State Back to GitHub (always)
+      # ------------------------------------------------------------------
+      - name: Push Reports, Error Logs & State Back to GitHub
+        if: always()
+        run: |
+          git config user.name  "BharatVoice ASIC CI Bot"
+          git config user.email "ci-bot@bharatvoice.asic"
+
+          # Stage everything that changed
+          git add pnr/reports/ || true
+          git add output/bharatvoice_top.gds || true
+          git add cadence_flow_error.log || true
+          git add .cadence_state || true
+          git add innovus.log || true
+          git add syn/reports/genus_flow.log || true
+
+          # Only commit if something actually changed
+          if git diff --cached --quiet; then
+            echo "[INFO] No changes to commit — reports are unchanged."
+          else
+            TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+            git commit -m "ci: auto-push flow reports [${TIMESTAMP}]
+
+          Stage: $(grep '^STAGE=' .cadence_state 2>/dev/null | cut -d= -f2 || echo 'unknown')
+          Status: $(grep '^STATUS=' .cadence_state 2>/dev/null | cut -d= -f2 || echo 'unknown')"
+
+            git push origin main
+          fi
