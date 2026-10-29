@@ -113,6 +113,7 @@ echo "[INFO] Using lec binary: $LEC_BIN"
 # -----------------------------------------------------------------------------
 if [ -f "$PRJ_ROOT/bharatvoice_lec_v2.tcl" ]; then
     echo "[INFO] Using verified golden script: bharatvoice_lec_v2.tcl"
+    grep -q "exit -force" "$PRJ_ROOT/bharatvoice_lec_v2.tcl" || echo "exit -force" >> "$PRJ_ROOT/bharatvoice_lec_v2.tcl"
     "$LEC_BIN" -nogui -tcl -dofile "$PRJ_ROOT/bharatvoice_lec_v2.tcl" -logfile "$PRJ_ROOT/lec/conformal.log"
 else
     "$LEC_BIN" -nogui -dofile "$DOFILE" -logfile "$PRJ_ROOT/lec/conformal.log"

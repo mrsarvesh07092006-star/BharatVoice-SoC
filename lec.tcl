@@ -38,3 +38,5 @@ compare
 
 report_verification -verbose
 report_compare_data -class nonequivalent -class abort -class notcompared
+
+exit -force
